@@ -7,59 +7,264 @@ CHANNEL="${AK3_CHANNEL:-REL}"
 DIST="${AOSP_DIST:-${ROOT}/out/${VARIANT}}"
 AK_DIR="${ROOT}/third_party/AnyKernel3"
 STAGE="${ROOT}/out/ak3-${VARIANT}"
+
+case "${VARIANT}" in
+  *[!A-Za-z0-9._-]*) echo "unsafe AOSP_VARIANT=${VARIANT}" >&2; exit 1 ;;
+esac
+case "${CHANNEL}" in
+  *[!A-Za-z0-9._-]*) echo "unsafe AK3_CHANNEL=${CHANNEL}" >&2; exit 1 ;;
+esac
+
 KVER="$(awk '
   /^VERSION[[:space:]]*=/ { v=$3 }
   /^PATCHLEVEL[[:space:]]*=/ { p=$3 }
   /^SUBLEVEL[[:space:]]*=/ { s=$3 }
   END {
     if (v == "" || p == "" || s == "") exit 1
+    if (v !~ /^[0-9]+$/ || p !~ /^[0-9]+$/ || s !~ /^[0-9]+$/) exit 1
     print v "." p "." s
   }
 ' "${ROOT}/gki/common/Makefile")"
 VER="${KVER}+SUSFS+RFKILL+${CHANNEL}"
 ZIP_NAME="${AK3_ZIP_NAME:-SukiSU-annibale-aosp-${KVER}-4k-SUSFS-${CHANNEL}-AnyKernel3.zip}"
+KERNEL_STRING="SukiSU Ultra GKI ${VER} 4k for REDMI K90 (annibale)"
 
-git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git "${AK_DIR}"
+case "${ZIP_NAME}" in
+  *[!A-Za-z0-9._+-]*|/*|*..*) echo "unsafe AK3_ZIP_NAME=${ZIP_NAME}" >&2; exit 1 ;;
+esac
+case "${AK_DIR}" in
+  "${ROOT}"/third_party/*) ;;
+  *) echo "refuse rm outside seed tree: ${AK_DIR}" >&2; exit 1 ;;
+esac
+case "${STAGE}" in
+  "${ROOT}"/out/*) ;;
+  *) echo "refuse rm outside seed tree: ${STAGE}" >&2; exit 1 ;;
+esac
 
-rm -rf "${STAGE}"
-mkdir -p "${STAGE}"
+# 官方 v2.2.0：WildPlusKernel/AnyKernel3 @ gki-2.0，默认 zip 只放未压缩 Image。
+rm -rf -- "${AK_DIR}"
+git clone --depth=1 --branch gki-2.0 \
+  https://github.com/WildPlusKernel/AnyKernel3.git "${AK_DIR}"
+
+rm -rf -- "${STAGE}"
+mkdir -p -- "${STAGE}"
 rsync -a --exclude='.git' --exclude='*.zip' "${AK_DIR}/" "${STAGE}/"
-rm -f "${STAGE}"/Image* "${STAGE}"/*.zip
-# 小米 GKI 的 boot 里内核是 lz4。只放 Image.lz4，避免 AK3 选中未压缩 Image 把 boot 撑爆。
-cp -f "${DIST}/Image.lz4" "${STAGE}/Image.lz4"
+rm -f -- "${STAGE}"/Image* "${STAGE}"/*.zip "${STAGE}/banner"
+if [[ ! -f "${DIST}/Image" ]]; then
+  echo "missing ${DIST}/Image (need uncompressed Image, not only Image.lz4)" >&2
+  exit 1
+fi
+cp -f -- "${DIST}/Image" "${STAGE}/Image"
 
-cat > "${STAGE}/anykernel.sh" <<EOF
-# AnyKernel3 Ramdisk Mod Script
-# osm0sis @ xda-developers
+# 官方 anykernel.sh 骨架 + LKM su 下用 sysfs 解析 boot 绝对路径。
+# 必须在 source ak3-core.sh 之前设好 block=：setup_ak 在 source 末尾就会跑。
+# 只认 boot / boot_a / boot_b，DEVNAME 只允许简单块名，避免写到错误分区。
+cat > "${STAGE}/anykernel.sh" <<'EOF'
+### AnyKernel3 Ramdisk Mod Script
+## osm0sis @ xda-developers
 
-## AnyKernel setup
+### AnyKernel setup
+# global properties
 properties() { '
-kernel.string=SukiSU Ultra GKI ${VER} 4k for REDMI K90 (annibale)
+kernel.string=KERNEL_STRING_PLACEHOLDER
 do.devicecheck=0
 do.modules=0
-do.systemless=1
+do.systemless=0
 do.cleanup=1
 do.cleanuponabort=0
-'; }
+do.check_boot_version=0
+device.name1=
+device.name2=
+device.name3=
+device.name4=
+device.name5=
+supported.versions=
+supported.patchlevels=
+supported.vendorpatchlevels=
+keycheck.timeout=10
+'; } # end properties
 
-block=boot;
-is_slot_device=auto;
-ramdisk_compression=auto;
-patch_vbmeta_flag=auto;
+trim() {
+  printf '%s' "$1" | tr -d '\r\n\t '
+}
 
-. tools/ak3-core.sh;
+safe_name() {
+  case "$1" in
+    ''|*[!A-Za-z0-9._-]*|*/*|*..*) return 1 ;;
+  esac
+  return 0
+}
 
-ui_print "SukiSU Ultra ${VARIANT} GKI ${VER} 4k";
-ui_print "device: annibale / 2510DRK44C";
+read_uevent_field() {
+  local val
+  val=$(grep "^$2=" "$1" 2>/dev/null | head -n1 | cut -d= -f2-)
+  trim "$val"
+}
 
-# GKI：boot 只有内核，ramdisk 在 init_boot。不要 dump_boot/write_boot。
-split_boot;
-flash_boot;
+current_slot() {
+  local slot
+  slot=$(trim "$(getprop ro.boot.slot_suffix 2>/dev/null)")
+  [ -n "$slot" ] || slot=$(trim "$(grep -o 'androidboot.slot_suffix=[^ ]*' /proc/cmdline 2>/dev/null | cut -d= -f2)")
+  if [ -z "$slot" ]; then
+    slot=$(trim "$(getprop ro.boot.slot 2>/dev/null)")
+    [ -n "$slot" ] || slot=$(trim "$(grep -o 'androidboot.slot=[^ ]*' /proc/cmdline 2>/dev/null | cut -d= -f2)")
+    [ -n "$slot" ] && [ "$slot" != "normal" ] && slot=_$slot
+  fi
+  [ "$slot" = "normal" ] && slot=
+  case "$slot" in
+    ''|_a|_b) printf '%s' "$slot" ;;
+    a|b) printf '_%s' "$slot" ;;
+    *) printf '' ;;
+  esac
+}
+
+wanted_part() {
+  local slot
+  slot=$(current_slot)
+  if [ -n "$slot" ]; then
+    printf 'boot%s' "$slot"
+  else
+    printf 'boot'
+  fi
+}
+
+accept_partname() {
+  local name="$1" want
+  want=$(wanted_part)
+  [ "$name" = "$want" ]
+}
+
+is_boot_block_path() {
+  case "$1" in
+    /dev/block/by-name/boot|/dev/block/by-name/boot_a|/dev/block/by-name/boot_b) ;;
+    /dev/block/bootdevice/by-name/boot|/dev/block/bootdevice/by-name/boot_a|/dev/block/bootdevice/by-name/boot_b) ;;
+    /dev/block/[A-Za-z][A-Za-z0-9._-]*) ;;
+    *) return 1 ;;
+  esac
+  [ -b "$1" ]
+}
+
+ensure_block_node() {
+  local dev="$1" uevent="$2" major minor dest
+  safe_name "$dev" || return 1
+  dest="/dev/block/$dev"
+  if [ -b "$dest" ]; then
+    printf '%s\n' "$dest"
+    return 0
+  fi
+  if [ -e "$dest" ]; then
+    return 1
+  fi
+  major=$(read_uevent_field "$uevent" MAJOR)
+  minor=$(read_uevent_field "$uevent" MINOR)
+  case "$major" in ''|*[!0-9]*) return 1 ;; esac
+  case "$minor" in ''|*[!0-9]*) return 1 ;; esac
+  mkdir -p /dev/block
+  mknod "$dest" b "$major" "$minor" 2>/dev/null || return 1
+  [ -b "$dest" ] || return 1
+  ui_print "  mknod $dest $major:$minor"
+  printf '%s\n' "$dest"
+}
+
+debug_boot_candidates() {
+  local uevent name dev major minor
+  ui_print " " "slot_suffix=$(current_slot) want=$(wanted_part)"
+  ui_print "by-name: $(ls /dev/block/by-name/boot /dev/block/by-name/boot_a /dev/block/by-name/boot_b 2>/dev/null)"
+  ui_print "bootdevice: $(ls /dev/block/bootdevice/by-name/boot /dev/block/bootdevice/by-name/boot_a /dev/block/bootdevice/by-name/boot_b 2>/dev/null)"
+  ui_print "sysfs PARTNAME=boot* :"
+  for uevent in /sys/dev/block/*/uevent; do
+    [ -f "$uevent" ] || continue
+    name=$(read_uevent_field "$uevent" PARTNAME)
+    case $name in
+      boot|boot_a|boot_b|BOOT|BOOT_A|BOOT_B)
+        dev=$(read_uevent_field "$uevent" DEVNAME)
+        major=$(read_uevent_field "$uevent" MAJOR)
+        minor=$(read_uevent_field "$uevent" MINOR)
+        ui_print "  $name dev=$dev $major:$minor"
+        ;;
+    esac
+  done
+}
+
+resolve_boot_block() {
+  local slot part name dev path uevent
+  slot=$(current_slot)
+  part=$(wanted_part)
+
+  for path in \
+    "/dev/block/by-name/$part" \
+    "/dev/block/bootdevice/by-name/$part"
+  do
+    if is_boot_block_path "$path"; then
+      printf '%s\n' "$path"
+      return 0
+    fi
+  done
+
+  for uevent in /sys/dev/block/*/uevent; do
+    [ -f "$uevent" ] || continue
+    name=$(read_uevent_field "$uevent" PARTNAME)
+    accept_partname "$name" || continue
+    dev=$(read_uevent_field "$uevent" DEVNAME)
+    path=$(ensure_block_node "$dev" "$uevent") || continue
+    is_boot_block_path "$path" || continue
+    printf '%s\n' "$path"
+    return 0
+  done
+  return 1
+}
+
+### AnyKernel install
+debug_boot_candidates
+resolved=$(resolve_boot_block | head -n 1)
+resolved=$(trim "$resolved")
+if is_boot_block_path "$resolved"; then
+  ui_print "boot block: $resolved"
+  block="$resolved"
+else
+  ui_print "boot block: unresolved, abort rather than guess"
+  abort "Unable to determine boot partition safely. Aborting..."
+fi
+is_slot_device=auto
+ramdisk_compression=auto
+patch_vbmeta_flag=auto
+no_magisk_check=1
+
+. tools/ak3-core.sh
+
+kernel_version=$(cat /proc/version | awk -F '-' '{print $1}' | awk '{print $3}')
+case $kernel_version in
+  5.10*|5.15*|6.1*|6.6*|6.12*) ksu_supported=true ;;
+  *) ksu_supported=false ;;
+esac
+ui_print " " "  -> GKI supported: $ksu_supported"
+$ksu_supported || abort "  -> Non-GKI device, abort."
+
+split_boot
+if [ -f "$SPLITIMG/ramdisk.cpio" ]; then
+  unpack_ramdisk
+  write_boot
+else
+  flash_boot
+fi
 EOF
+
+python3 -c '
+import pathlib, sys
+p = pathlib.Path(sys.argv[1])
+text = p.read_text(encoding="utf-8")
+old = "KERNEL_STRING_PLACEHOLDER"
+new = sys.argv[2]
+if old not in text:
+    raise SystemExit("placeholder missing")
+if "\n" in new or "\r" in new or "'"'"'" in new:
+    raise SystemExit("unsafe kernel.string")
+p.write_text(text.replace(old, new, 1), encoding="utf-8")
+' "${STAGE}/anykernel.sh" "${KERNEL_STRING}"
 
 (
   cd "${STAGE}"
-  rm -f "${ROOT}/out/${ZIP_NAME}"
+  rm -f -- "${ROOT}/out/${ZIP_NAME}"
   zip -r9 "${ROOT}/out/${ZIP_NAME}" . -x '*.git*'
 )
 echo "packed ${ROOT}/out/${ZIP_NAME}"
