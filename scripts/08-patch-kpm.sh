@@ -120,9 +120,35 @@ if [[ "${out_size}" -le "${src_size}" ]]; then
 fi
 
 cp -f -- "${WORK}/oImage" "${DIST}/Image-kpm"
-lz4 -f -12 "${DIST}/Image-kpm" "${DIST}/Image-kpm.lz4"
+# AOSP/GKI 的 Image.lz4 是 legacy（02 21 4C 18），不是默认 frame（04 22 4D 18）。
+# 用错格式时 bootloader 解不开内核，fastboot boot 会黑屏、没有开机动画。
+lz4 -f -l -12 --favor-decSpeed "${DIST}/Image-kpm" "${DIST}/Image-kpm.lz4"
 echo "wrote ${DIST}/Image-kpm"
 echo "wrote ${DIST}/Image-kpm.lz4"
+python3 - "${DIST}/Image.lz4" "${DIST}/Image-kpm.lz4" <<'PY'
+import sys
+from pathlib import Path
+
+LEGACY = b"\x02\x21\x4c\x18"
+FRAME = b"\x04\x22\x4d\x18"
+
+def magic(p):
+    b = Path(p).read_bytes()[:4]
+    return b.hex(), {LEGACY: "lz4-legacy", FRAME: "lz4-frame"}.get(b, "unknown")
+
+ok = True
+for p in sys.argv[1:]:
+    path = Path(p)
+    if not path.exists():
+        continue
+    hx, name = magic(path)
+    print(f"{p}: {name} ({hx})")
+    if path.name == "Image-kpm.lz4" and name != "lz4-legacy":
+        print(f"Image-kpm.lz4 must be lz4-legacy (02214c18), got {name}", file=sys.stderr)
+        ok = False
+if not ok:
+    sys.exit(1)
+PY
 
 rebuild_boot_kpm() {
   local src_boot="$1" dst_boot="$2" kernel="$3"
