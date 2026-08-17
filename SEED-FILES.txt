@@ -1,0 +1,18 @@
+# Files required to rebuild the verified K90 GKI on a new Linux machine.
+# Copy this list (or run scripts/pack-seed.sh) — do NOT copy gki/, xiaomi/, out/, third_party/.
+BUILD-K90-GKI.md
+README.md
+SEED-FILES.txt
+configs/sukisu.fragment
+scripts/00-install-deps.sh
+scripts/01-sync-aosp-gki.sh
+scripts/02-fetch-xiaomi.sh
+scripts/03-apply-sukisu.sh
+scripts/04-build-gki.sh
+scripts/05-pack-anykernel.sh
+scripts/06-apply-susfs.sh
+scripts/07-apply-shirkneko-defaults.sh
+scripts/pack-seed.sh
+scripts/lib/apply_hide_stuff.py
+scripts/test/07-apply-defaults.sh
+scripts/test/lib/apply_hide_stuff.py

@@ -1,0 +1,165 @@
+# REDMI K90 (annibale) — AOSP GKI 6.6.77 + SukiSU + SUSFS
+#
+# 顺序与 BUILD-K90-GKI.md 第 3.2 节一致，不要改步骤、不要跑 02、不要编 16K。
+# 标准 GitHub-hosted runner（约 4 核 / 16GB）用 BUILD_JOBS=3、LTO=thin，和手册一致。
+# 磁盘：endersonmenezes/free-disk-space@v3（已验证清完约 55G）。
+# 不要用 maximize-build-space：这台镜像没有独立 /mnt，LVM 会把根分区吃光。
+
+name: Build K90 GKI
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "GitHub-hosted 镜像，或自建 runner 标签（如 self-hosted）"
+        type: string
+        default: ubuntu-22.04
+      lto:
+        description: "LTO（thin = 已验证配置；none = 更快、仅调试）"
+        type: choice
+        default: thin
+        options:
+          - thin
+          - none
+      jobs:
+        description: "bazel --jobs（auto = 按 CPU/内存估算）"
+        type: string
+        default: auto
+      create_release:
+        description: "构建成功后发布 GitHub Release"
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*"
+    branches:
+      - main
+      - master
+    paths:
+      - "scripts/**"
+      - "configs/**"
+      - ".github/workflows/build-gki.yml"
+
+concurrency:
+  group: k90-gki-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+  GKI_MANIFEST_BRANCH: common-android15-6.6
+  GKI_KERNEL_TAG: android15-6.6-2025-03_r15
+  EXPECTED_UNAME: 6.6.77-android15-8-g4a507830d890-4k
+
+jobs:
+  build:
+    name: aosp-release 4K
+    runs-on: ${{ github.event.inputs.runner || 'ubuntu-22.04' }}
+    timeout-minutes: 360
+    env:
+      LTO: ${{ github.event.inputs.lto || 'thin' }}
+      BUILD_JOBS: ${{ github.event.inputs.jobs || 'auto' }}
+
+    steps:
+      - name: Checkout seed
+        uses: actions/checkout@v4
+
+      - name: Normalize script line endings
+        run: |
+          set -euo pipefail
+          # Windows 工作区提交的 CRLF 会让 bash 直接挂掉。
+          find scripts -type f \( -name '*.sh' -o -name '*.py' \) -print0 \
+            | xargs -0 sed -i 's/\r$//'
+
+      - name: Free disk (free-disk-space@v3)
+        if: ${{ startsWith(github.event.inputs.runner || 'ubuntu-22.04', 'ubuntu-') }}
+        uses: endersonmenezes/free-disk-space@v3
+        with:
+          remove_android: true
+          remove_dotnet: true
+          remove_haskell: true
+          remove_tool_cache: true
+          # 这台机只有 8G 内存 + 3G 自带 swap，thin LTO 不能再卸 swap。
+          remove_swap: false
+          remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
+          remove_packages_one_command: true
+          remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle /opt/az /opt/microsoft /opt/pipx /usr/local/share/boost"
+          rm_cmd: rm
+          testing: false
+
+      - name: Keep caches on the workspace volume
+        run: |
+          set -euo pipefail
+          mkdir -p "${GITHUB_WORKSPACE}/.cache" "${GITHUB_WORKSPACE}/tmp"
+          rm -rf "${HOME}/.cache"
+          ln -sfn "${GITHUB_WORKSPACE}/.cache" "${HOME}/.cache"
+          echo "TMPDIR=${GITHUB_WORKSPACE}/tmp" >> "${GITHUB_ENV}"
+          echo "TMP=${GITHUB_WORKSPACE}/tmp" >> "${GITHUB_ENV}"
+          echo "TEMP=${GITHUB_WORKSPACE}/tmp" >> "${GITHUB_ENV}"
+
+      - name: Install deps
+        run: |
+          set -euo pipefail
+          sudo bash scripts/00-install-deps.sh
+          git config --global user.name "gki-builder"
+          git config --global user.email "gki-builder@localhost"
+          git config --global color.ui false
+          git config --global --add safe.directory '*'
+
+      - name: Sync AOSP GKI (01)
+        run: bash scripts/01-sync-aosp-gki.sh
+
+      - name: Apply SukiSU (03)
+        run: bash scripts/03-apply-sukisu.sh
+
+      - name: Apply SUSFS (06)
+        run: bash scripts/06-apply-susfs.sh
+
+      - name: Apply ShirkNeko defaults (07)
+        run: bash scripts/07-apply-shirkneko-defaults.sh
+
+      - name: Build GKI (04)
+        run: bash scripts/04-build-gki.sh
+
+      - name: Pack AnyKernel3 (05)
+        run: bash scripts/05-pack-anykernel.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SukiSU-annibale-aosp-6.6.77-4k-SUSFS-REL-${{ github.run_number }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            out/aosp-release/boot-lz4.img
+            out/aosp-release/boot-gz.img
+            out/aosp-release/boot.img
+            out/aosp-release/Image
+            out/aosp-release/Image.gz
+            out/aosp-release/Image.lz4
+            out/aosp-release/System.map
+            out/SukiSU-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
+
+      - name: Publish GitHub Release
+        if: ${{ github.ref_type == 'tag' || inputs.create_release }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('ci-{0}', github.run_number) }}
+          name: K90 GKI ${{ env.EXPECTED_UNAME }} (${{ github.ref_type == 'tag' && github.ref_name || format('run {0}', github.run_number) }})
+          generate_release_notes: true
+          body: |
+            REDMI K90 (`annibale`) AOSP GKI **${{ env.EXPECTED_UNAME }}**
+            + 内置 SukiSU/KPM + SUSFS + `RFKILL=y`。
+
+            优先临时启动（已验证路径）：
+
+            ```
+            fastboot boot boot-lz4.img
+            ```
+
+            不要刷 `system_dlkm*.img`。不要用 16K / 网上通用 GKI。
+          files: |
+            out/aosp-release/boot-lz4.img
+            out/SukiSU-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip

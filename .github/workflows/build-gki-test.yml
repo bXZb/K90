@@ -1,0 +1,162 @@
+# REDMI K90 (annibale) — 测试构建：新 GKI 源 + 00→01→03→06→test/07→04→05
+#
+# 正式机请继续用 build-gki.yml（钉死 2025-03_r15 / 6.6.77）。
+# 本文件只手动触发，不发 Release，产物进 out/aosp-test。
+# 默认：最新认证月度 tag。滚动分支请在 Run workflow 里把 source 改成 rolling。
+# 不要跑 02、不要编 16K、不要刷 system_dlkm。
+
+name: Build K90 GKI (test)
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "内核源。monthly = 认证冻结 tag（推荐）；rolling = android15-6.6 HEAD"
+        type: choice
+        default: monthly
+        options:
+          - monthly
+          - rolling
+      kernel_tag:
+        description: "钉 common 的 tag。仅 monthly 使用；空 = android15-6.6-2026-07_r5"
+        type: string
+        default: ""
+      kernel_ref:
+        description: "钉 common 的 git ref。仅 rolling 使用；空 = refs/heads/android15-6.6"
+        type: string
+        default: ""
+      manifest_branch:
+        description: "repo init -b。空 = 按 source 自动选"
+        type: string
+        default: ""
+      runner:
+        description: "GitHub-hosted 镜像，或自建 runner 标签（如 self-hosted）"
+        type: string
+        default: ubuntu-22.04
+      lto:
+        description: "LTO（thin = 已验证配置；none = 更快、仅调试）"
+        type: choice
+        default: thin
+        options:
+          - thin
+          - none
+      jobs:
+        description: "bazel --jobs（auto = 按 CPU/内存估算）"
+        type: string
+        default: auto
+
+concurrency:
+  group: k90-gki-test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: aosp-test 4K
+    runs-on: ${{ inputs.runner || 'ubuntu-22.04' }}
+    timeout-minutes: 360
+    env:
+      LTO: ${{ inputs.lto || 'thin' }}
+      BUILD_JOBS: ${{ inputs.jobs || 'auto' }}
+      AOSP_VARIANT: aosp-test
+      AOSP_DIST: ${{ github.workspace }}/out/aosp-test
+      AK3_CHANNEL: TEST
+
+    steps:
+      - name: Checkout seed
+        uses: actions/checkout@v4
+
+      - name: Pick GKI source
+        run: |
+          set -euo pipefail
+          src="${{ inputs.source }}"
+          tag="${{ inputs.kernel_tag }}"
+          ref="${{ inputs.kernel_ref }}"
+          man="${{ inputs.manifest_branch }}"
+          if [[ "${src}" == "rolling" ]]; then
+            echo "GKI_MANIFEST_BRANCH=${man:-common-android15-6.6}" >> "${GITHUB_ENV}"
+            echo "GKI_KERNEL_REF=${ref:-refs/heads/android15-6.6}" >> "${GITHUB_ENV}"
+            echo "GKI_KERNEL_TAG=" >> "${GITHUB_ENV}"
+          else
+            echo "GKI_MANIFEST_BRANCH=${man:-common-android15-6.6-2026-07}" >> "${GITHUB_ENV}"
+            echo "GKI_KERNEL_TAG=${tag:-android15-6.6-2026-07_r5}" >> "${GITHUB_ENV}"
+            echo "GKI_KERNEL_REF=" >> "${GITHUB_ENV}"
+          fi
+
+      - name: Normalize script line endings
+        run: |
+          set -euo pipefail
+          # Windows 工作区提交的 CRLF 会让 bash 直接挂掉。
+          find scripts -type f \( -name '*.sh' -o -name '*.py' \) -print0 \
+            | xargs -0 sed -i 's/\r$//'
+
+      - name: Free disk (free-disk-space@v3)
+        if: ${{ startsWith(inputs.runner || 'ubuntu-22.04', 'ubuntu-') }}
+        uses: endersonmenezes/free-disk-space@v3
+        with:
+          remove_android: true
+          remove_dotnet: true
+          remove_haskell: true
+          remove_tool_cache: true
+          # 这台机只有 8G 内存 + 3G 自带 swap，thin LTO 不能再卸 swap。
+          remove_swap: false
+          remove_packages: "azure-cli google-cloud-cli microsoft-edge-stable google-chrome-stable firefox postgresql* temurin-* *llvm* mysql* dotnet-sdk-*"
+          remove_packages_one_command: true
+          remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell /usr/local/julia /usr/local/aws-cli /usr/local/aws-sam-cli /usr/share/gradle /opt/az /opt/microsoft /opt/pipx /usr/local/share/boost"
+          rm_cmd: rm
+          testing: false
+
+      - name: Keep caches on the workspace volume
+        run: |
+          set -euo pipefail
+          mkdir -p "${GITHUB_WORKSPACE}/.cache" "${GITHUB_WORKSPACE}/tmp"
+          rm -rf "${HOME}/.cache"
+          ln -sfn "${GITHUB_WORKSPACE}/.cache" "${HOME}/.cache"
+          echo "TMPDIR=${GITHUB_WORKSPACE}/tmp" >> "${GITHUB_ENV}"
+          echo "TMP=${GITHUB_WORKSPACE}/tmp" >> "${GITHUB_ENV}"
+          echo "TEMP=${GITHUB_WORKSPACE}/tmp" >> "${GITHUB_ENV}"
+
+      - name: Install deps
+        run: |
+          set -euo pipefail
+          sudo bash scripts/00-install-deps.sh
+          git config --global user.name "gki-builder"
+          git config --global user.email "gki-builder@localhost"
+          git config --global color.ui false
+          git config --global --add safe.directory '*'
+
+      - name: Sync AOSP GKI (01)
+        run: bash scripts/01-sync-aosp-gki.sh
+
+      - name: Apply SukiSU (03)
+        run: bash scripts/03-apply-sukisu.sh
+
+      - name: Apply SUSFS (06)
+        run: bash scripts/06-apply-susfs.sh
+
+      - name: Apply test defaults (07)
+        run: bash scripts/test/07-apply-defaults.sh
+
+      - name: Build GKI (04)
+        run: bash scripts/04-build-gki.sh
+
+      - name: Pack AnyKernel3 (05)
+        run: bash scripts/05-pack-anykernel.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SukiSU-annibale-aosp-TEST-${{ inputs.source }}-${{ github.run_number }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            out/aosp-test/boot-lz4.img
+            out/aosp-test/boot-gz.img
+            out/aosp-test/boot.img
+            out/aosp-test/Image
+            out/aosp-test/Image.gz
+            out/aosp-test/Image.lz4
+            out/aosp-test/System.map
+            out/SukiSU-annibale-aosp-*-4k-SUSFS-TEST-AnyKernel3.zip
