@@ -1,8 +1,9 @@
-# REDMI K90 (annibale) — 测试构建：新 GKI 源 + 00→01→03→06→test/07→04→05
+# REDMI K90 (annibale) — 测试构建：同代较新 GKI + 00→01→03→06→07→04→05
 #
-# 正式机请继续用 build-gki.yml（钉死 2025-03_r15 / 6.6.77）。
+# 正式机请继续用 build-gki.yml（钉死 2025-03_r15 / 4a507830d890）。
 # 本文件只手动触发，不发 Release，产物进 out/aosp-test。
-# 默认：最新认证月度 tag。滚动分支请在 Run workflow 里把 source 改成 rolling。
+# 默认：同一条 6.6.77 冻结线的最晚 respin r21（1cfd9a28721c）。
+# r21 仍是 6.6.77，hide_stuff 用主线 07，不用 scripts/test/（那是 6.6.139 用的）。
 # 不要跑 02、不要编 16K、不要刷 system_dlkm。
 
 name: Build K90 GKI (test)
@@ -11,14 +12,14 @@ on:
   workflow_dispatch:
     inputs:
       source:
-        description: "内核源。monthly = 认证冻结 tag（推荐）；rolling = android15-6.6 HEAD"
+        description: "内核源。monthly = 2025-03_r21（同代 6.6.77）；rolling = android15-6.6 HEAD"
         type: choice
         default: monthly
         options:
           - monthly
           - rolling
       kernel_tag:
-        description: "钉 common 的 tag。仅 monthly 使用；空 = android15-6.6-2026-07_r5"
+        description: "钉 common 的 tag。仅 monthly 使用；空 = android15-6.6-2025-03_r21"
         type: string
         default: ""
       kernel_ref:
@@ -80,8 +81,8 @@ jobs:
             echo "GKI_KERNEL_REF=${ref:-refs/heads/android15-6.6}" >> "${GITHUB_ENV}"
             echo "GKI_KERNEL_TAG=" >> "${GITHUB_ENV}"
           else
-            echo "GKI_MANIFEST_BRANCH=${man:-common-android15-6.6-2026-07}" >> "${GITHUB_ENV}"
-            echo "GKI_KERNEL_TAG=${tag:-android15-6.6-2026-07_r5}" >> "${GITHUB_ENV}"
+            echo "GKI_MANIFEST_BRANCH=${man:-common-android15-6.6-2025-03}" >> "${GITHUB_ENV}"
+            echo "GKI_KERNEL_TAG=${tag:-android15-6.6-2025-03_r21}" >> "${GITHUB_ENV}"
             echo "GKI_KERNEL_REF=" >> "${GITHUB_ENV}"
           fi
 
@@ -136,8 +137,8 @@ jobs:
       - name: Apply SUSFS (06)
         run: bash scripts/06-apply-susfs.sh
 
-      - name: Apply test defaults (07)
-        run: bash scripts/test/07-apply-defaults.sh
+      - name: Apply ShirkNeko defaults (07)
+        run: bash scripts/07-apply-shirkneko-defaults.sh
 
       - name: Build GKI (04)
         run: bash scripts/04-build-gki.sh
