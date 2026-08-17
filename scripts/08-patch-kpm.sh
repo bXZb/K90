@@ -9,8 +9,11 @@ STAGE="${ROOT}/out/ak3-${VARIANT}"
 WORK="${ROOT}/out/kpm-work"
 TOOLS="${ROOT}/out/kpm-tools"
 KPM_KEY="${KPM_KEY:-123}"
-KPTOOLS_URL="${KPTOOLS_URL:-https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/kptools}"
+# 管理器下的 kpm/kptools 是 Android aarch64（interpreter /system/bin/linker64），CI 不能 qemu。
+# kpimg 仍用管理器同一份；kptools 用 SukiSU 的 Linux 主机版。
+KPTOOLS_URL="${KPTOOLS_URL:-https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/kptools-linux}"
 KPIMG_URL="${KPIMG_URL:-https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/kpimg}"
+PATCH_LINUX_URL="${PATCH_LINUX_URL:-https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux}"
 
 case "${VARIANT}" in
   *[!A-Za-z0-9._-]*) echo "unsafe AOSP_VARIANT=${VARIANT}" >&2; exit 1 ;;
@@ -63,24 +66,22 @@ if [[ "${kptools_size}" -lt 1024 || "${kpimg_size}" -lt 1024 ]]; then
   exit 1
 fi
 
+# Android 动态链接的 kptools 在 Linux 上跑不了，换成 SukiSU 的 linux 主机版。
+if echo "${kptools_info}" | grep -qi 'linker64\|Android'; then
+  echo "got Android kptools; downloading kptools-linux instead"
+  curl -fL --retry 3 -o "${TOOLS}/kptools" \
+    "https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/kptools-linux"
+  chmod a+rx -- "${TOOLS}/kptools"
+  kptools_info="$(file -b "${TOOLS}/kptools")"
+  echo "kptools: $(wc -c < "${TOOLS}/kptools") bytes (${kptools_info})"
+fi
+
 run_kptools() {
   if echo "${kptools_info}" | grep -qi 'x86-64\|x86_64\|Intel 80386'; then
     "${TOOLS}/kptools" "$@"
     return
   fi
-  if echo "${kptools_info}" | grep -qi 'aarch64\|ARM aarch64'; then
-    if ! command -v qemu-aarch64-static >/dev/null 2>&1; then
-      if command -v sudo >/dev/null 2>&1; then
-        sudo apt-get install -y --no-install-recommends qemu-user-static
-      else
-        echo "need qemu-aarch64-static to run android kptools" >&2
-        exit 1
-      fi
-    fi
-    qemu-aarch64-static "${TOOLS}/kptools" "$@"
-    return
-  fi
-  echo "unsupported kptools arch: ${kptools_info}" >&2
+  echo "unsupported kptools for CI host: ${kptools_info}" >&2
   exit 1
 }
 
@@ -90,13 +91,25 @@ cp -f -- "${DIST}/Image" "${WORK}/Image"
 cp -f -- "${TOOLS}/kptools" "${TOOLS}/kpimg" "${WORK}/"
 src_size="$(wc -c < "${WORK}/Image")"
 echo "patching Image (${src_size} bytes) with kptools -p -s ${KPM_KEY}"
+set +e
 (
   cd "${WORK}"
   chmod a+rx ./kptools
   run_kptools -p -s "${KPM_KEY}" -i Image -k kpimg -o oImage
 )
+kptools_rc=$?
+set -e
 if [[ ! -f "${WORK}/oImage" ]]; then
-  echo "kptools produced no oImage" >&2
+  echo "kptools failed (rc=${kptools_rc}); fallback to SukiSU_patch patch_linux"
+  curl -fL --retry 3 -o "${WORK}/patch_linux" "${PATCH_LINUX_URL}"
+  chmod a+rx -- "${WORK}/patch_linux"
+  (
+    cd "${WORK}"
+    ./patch_linux
+  )
+fi
+if [[ ! -f "${WORK}/oImage" ]]; then
+  echo "no oImage from kptools or patch_linux" >&2
   exit 1
 fi
 out_size="$(wc -c < "${WORK}/oImage")"
