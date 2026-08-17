@@ -150,42 +150,115 @@ if not ok:
     sys.exit(1)
 PY
 
+find_avbtool() {
+  local p
+  if command -v avbtool >/dev/null 2>&1; then
+    command -v avbtool
+    return 0
+  fi
+  for p in \
+    "${ROOT}/gki/prebuilts/kernel-build-tools/linux-x86/bin/avbtool" \
+    "${ROOT}/gki/prebuilts/build-tools/linux-x86/bin/avbtool" \
+    "${ROOT}/gki/external/avb/avbtool.py"
+  do
+    if [[ -f "${p}" ]]; then
+      echo "${p}"
+      return 0
+    fi
+  done
+  p="$(find "${ROOT}/gki" -type f \( -name avbtool -o -name avbtool.py \) 2>/dev/null | head -n1 || true)"
+  if [[ -n "${p}" ]]; then
+    echo "${p}"
+    return 0
+  fi
+  return 1
+}
+
+run_avbtool() {
+  local tool="$1"
+  shift
+  if [[ "${tool}" == *.py ]] || grep -q '^#!.*python' "${tool}" 2>/dev/null; then
+    python3 "${tool}" "$@"
+  else
+    "${tool}" "$@"
+  fi
+}
+
+# AOSP boot-lz4.img 是 51MiB + AVB hash footer。只写 header+kernel（约 17MB）
+# 时 Xiaomi bootloader 不认，fastboot boot 黑屏。必须按原分区大小重打 footer。
 rebuild_boot_kpm() {
   local src_boot="$1" dst_boot="$2" kernel="$3"
-  python3 - "${src_boot}" "${kernel}" "${dst_boot}" <<'PY'
-import struct, sys
+  local avbtool part_size patch_prop meta
+  meta="${WORK}/boot-kpm.meta"
+  python3 - "${src_boot}" "${kernel}" "${dst_boot}" "${meta}" <<'PY'
+import re, struct, sys
 from pathlib import Path
 
-boot_path, kernel_path, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
+boot_path, kernel_path, out_path, meta_path = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 boot = Path(boot_path).read_bytes()
 kernel = Path(kernel_path).read_bytes()
 if boot[:8] != b"ANDROID!":
     raise SystemExit(f"not an Android boot image: {boot_path}")
-if len(boot) < 44:
-    raise SystemExit("boot header too small")
-old_ksize, ramdisk_size, os_version, hdr_size = struct.unpack_from("<IIII", boot, 8)
+if len(boot) < 4096:
+    raise SystemExit("boot header page missing")
+old_ksize, _ramdisk, _os, hdr_size = struct.unpack_from("<IIII", boot, 8)
 hdr_ver = struct.unpack_from("<I", boot, 40)[0]
-if hdr_size < 44 or hdr_size > len(boot):
+if hdr_size < 44 or hdr_size > 4096:
     raise SystemExit(f"bad header_size {hdr_size}")
 page = 4096
-hdr_pages = (hdr_size + page - 1) // page
-new_hdr = bytearray(boot[:hdr_size])
-struct.pack_into("<I", new_hdr, 8, len(kernel))
+hdr = bytearray(boot[:page])
+struct.pack_into("<I", hdr, 8, len(kernel))
 if hdr_ver >= 4 and hdr_size >= 1584:
-    struct.pack_into("<I", new_hdr, 1580, 0)
+    struct.pack_into("<I", hdr, 1580, 0)
 kpad = (len(kernel) + page - 1) // page * page
-out = bytes(new_hdr).ljust(hdr_pages * page, b"\0") + kernel.ljust(kpad, b"\0")
-Path(out_path).write_bytes(out)
-print(f"rebuilt {out_path} from {boot_path} (hdr_v{hdr_ver}, kernel {old_ksize}->{len(kernel)})")
+Path(out_path).write_bytes(bytes(hdr) + kernel.ljust(kpad, b"\0"))
+prop = ""
+m = re.search(br"com\.android\.build\.boot\.security_patch\x00*(20\d{2}-\d{2}-\d{2})", boot)
+if m:
+    prop = m.group(1).decode("ascii")
+Path(meta_path).write_text(f"{len(boot)}\n{prop}\n", encoding="ascii")
+print(f"raw {out_path} hdr_v{hdr_ver} kernel {old_ksize}->{len(kernel)} src={len(boot)} patch={prop or 'none'}")
+PY
+  part_size="$(sed -n '1p' "${meta}")"
+  patch_prop="$(sed -n '2p' "${meta}")"
+
+  if ! avbtool="$(find_avbtool)"; then
+    echo "avbtool not in PATH/gki; downloading avbtool.py"
+    curl -fL --retry 3 -o "${TOOLS}/avbtool.py" \
+      "https://raw.githubusercontent.com/LineageOS/android_external_avb/lineage-22.2/avbtool.py"
+    avbtool="${TOOLS}/avbtool.py"
+  fi
+  echo "avbtool: ${avbtool} partition_size=${part_size} security_patch=${patch_prop:-none}"
+  if [[ -n "${patch_prop}" ]]; then
+    run_avbtool "${avbtool}" add_hash_footer \
+      --image "${dst_boot}" \
+      --partition_size "${part_size}" \
+      --partition_name boot \
+      --prop "com.android.build.boot.security_patch:${patch_prop}"
+  else
+    run_avbtool "${avbtool}" add_hash_footer \
+      --image "${dst_boot}" \
+      --partition_size "${part_size}" \
+      --partition_name boot
+  fi
+  python3 - "${src_boot}" "${dst_boot}" <<'PY'
+import sys
+from pathlib import Path
+src, dst = Path(sys.argv[1]).read_bytes(), Path(sys.argv[2]).read_bytes()
+if dst[:8] != b"ANDROID!":
+    raise SystemExit("rebuilt boot lost ANDROID! magic")
+if dst[-64:-60] != b"AVBf":
+    raise SystemExit("rebuilt boot missing AVB footer")
+if len(dst) != len(src):
+    raise SystemExit(f"rebuilt size {len(dst)} != source {len(src)}")
+print(f"rebuilt {sys.argv[2]} size {len(dst)} AVBf ok")
 PY
 }
 
 if [[ -f "${DIST}/boot-lz4.img" ]]; then
-  rebuild_boot_kpm "${DIST}/boot-lz4.img" "${DIST}/boot-kpm-lz4.img" "${DIST}/Image-kpm.lz4" \
-    || echo "warn: could not rebuild boot-kpm-lz4.img"
+  rebuild_boot_kpm "${DIST}/boot-lz4.img" "${DIST}/boot-kpm-lz4.img" "${DIST}/Image-kpm.lz4"
 elif [[ -f "${DIST}/boot.img" ]]; then
-  rebuild_boot_kpm "${DIST}/boot.img" "${DIST}/boot-kpm.img" "${DIST}/Image-kpm" \
-    || echo "warn: could not rebuild boot-kpm.img"
+  rebuild_boot_kpm "${DIST}/boot.img" "${DIST}/boot-kpm.img" "${DIST}/Image-kpm"
 else
   echo "no boot.img/boot-lz4.img; skip boot-kpm"
 fi
