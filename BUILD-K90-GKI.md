@@ -70,6 +70,7 @@ bash scripts/07-apply-shirkneko-defaults.sh
 AOSP_DIST="$ROOT/out/aosp-release" BUILD_JOBS=3 LTO=thin \
   bash scripts/04-build-gki.sh aosp
 bash scripts/05-pack-anykernel.sh
+bash scripts/08-patch-kpm.sh
 ```
 
 ### 3.2 全新系统：解压 seed 之后从零拉源码
@@ -84,6 +85,7 @@ bash scripts/07-apply-shirkneko-defaults.sh
 AOSP_DIST="$ROOT/out/aosp-release" BUILD_JOBS=3 LTO=thin \
   bash scripts/04-build-gki.sh aosp
 bash scripts/05-pack-anykernel.sh
+bash scripts/08-patch-kpm.sh
 ```
 
 顺序不能乱：`03` 把 SukiSU 停在 `main`，`06` 才切到 `builtin` 并打 SUSFS，`07` 才做 RFKILL 清单 / hide_stuff / 去 dirty。只跑 `03`+`06` 就编，**bazel 会在缺 `rfkill.ko` 时失败**，或者编出 WiFi/蓝牙仍坏的包。
@@ -130,7 +132,8 @@ bash scripts/05-pack-anykernel.sh
 | `02-fetch-xiaomi.sh` | 拉小米 OSS | 主路径不用 |
 | `03-apply-sukisu.sh aosp` | `setup.sh` + checkout **`main`**，再把 `configs/sukisu.fragment` 合进 defconfig（含 `KSU`/`KPM`/`RFKILL=y`，也会写入 `KSU_MANUAL_SU`） | 没有 SUSFS；SukiSU 还停在 `main` |
 | `04-build-gki.sh aosp` | 在 `gki/` 里 `tools/bazel run --lto=thin //common:kernel_aarch64_dist`，输出到 `AOSP_DIST`（默认 `out/aosp`） | **不再** merge fragment。AOSP 路径走 kleaf 自己的 clang，**不用** 脚本里的 `find_clang_bin`（那个只给 xiaomi make 用） |
-| `05-pack-anykernel.sh` | 从 `out/aosp-release/Image.lz4` 打 zip | zip **尚未**在真机刷过，真机验证的是 `boot-lz4.img` |
+| `05-pack-anykernel.sh` | WildPlus AK3 + 未压缩 `Image` | 不预打 KPM |
+| `08-patch-kpm.sh` | 用管理器同款 `kptools`+`kpimg`（`-s 123`）补 `Image`，产出 `Image-kpm` / `boot-kpm-lz4.img` / `*-KPM-AnyKernel3.zip` | 不改未修补的 `Image` 和普通 AK3 zip |
 | `06-apply-susfs.sh` | checkout SukiSU **`builtin`**，打 `susfs4ksu` 的 `50_add_susfs_in_gki-android15-6.6.patch`，追加 SUSFS defconfig，删掉 `KSU_MANUAL_SU`。有 `gki/common/.sukisu_susfs_applied` 就跳过 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
 | `07-apply-shirkneko-defaults.sh` | **落地** RFKILL=y、删 `rfkill.ko`、关 check_defconfig、TTL/HL、去 protected_exports、去 maybe-dirty、hide_stuff。可重复跑 | 不开 ZRAM/BBG/默认 BBR |
 

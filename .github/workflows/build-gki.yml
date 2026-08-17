@@ -126,6 +126,9 @@ jobs:
       - name: Pack AnyKernel3 (05)
         run: bash scripts/05-pack-anykernel.sh
 
+      - name: Patch KPM Image (08)
+        run: bash scripts/08-patch-kpm.sh
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -139,8 +142,13 @@ jobs:
             out/aosp-release/Image
             out/aosp-release/Image.gz
             out/aosp-release/Image.lz4
+            out/aosp-release/Image-kpm
+            out/aosp-release/Image-kpm.lz4
+            out/aosp-release/boot-kpm.img
+            out/aosp-release/boot-kpm-lz4.img
             out/aosp-release/System.map
             out/SukiSU-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
+            out/SukiSU-annibale-aosp-*-4k-SUSFS-REL-KPM-AnyKernel3.zip
 
       - name: Publish GitHub Release
         if: ${{ github.ref_type == 'tag' || inputs.create_release }}
@@ -162,4 +170,6 @@ jobs:
             不要刷 `system_dlkm*.img`。不要用 16K / 网上通用 GKI。
           files: |
             out/aosp-release/boot-lz4.img
+            out/aosp-release/boot-kpm-lz4.img
             out/SukiSU-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
+            out/SukiSU-annibale-aosp-*-4k-SUSFS-REL-KPM-AnyKernel3.zip

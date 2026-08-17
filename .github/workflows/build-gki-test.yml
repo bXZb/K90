@@ -147,6 +147,9 @@ jobs:
       - name: Pack AnyKernel3 (05)
         run: bash scripts/05-pack-anykernel.sh
 
+      - name: Patch KPM Image (08)
+        run: bash scripts/08-patch-kpm.sh
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -160,5 +163,10 @@ jobs:
             out/aosp-test/Image
             out/aosp-test/Image.gz
             out/aosp-test/Image.lz4
+            out/aosp-test/Image-kpm
+            out/aosp-test/Image-kpm.lz4
+            out/aosp-test/boot-kpm.img
+            out/aosp-test/boot-kpm-lz4.img
             out/aosp-test/System.map
             out/SukiSU-annibale-aosp-*-4k-SUSFS-TEST-AnyKernel3.zip
+            out/SukiSU-annibale-aosp-*-4k-SUSFS-TEST-KPM-AnyKernel3.zip
