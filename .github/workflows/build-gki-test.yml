@@ -1,11 +1,11 @@
-# REDMI K90 (annibale) — 测试构建：同代较新 GKI + 00→01→03→06→07→04→05
+# REDMI K90 (annibale) — 测试构建：同代较新 GKI + 00→01→02→03→04→05→06→07
 #
 # 正式机请继续用 build-gki.yml（钉死 2025-03_r15 / 4a507830d890）。
 # 本文件只手动触发，不发 Release，产物进 out/aosp-test。
 # 默认：common-android15-6.6 清单 + tag r21（1cfd9a28721c）。
 # 不要用 common-android15-6.6-2025-03：对应 heads 已迁到 deprecated/，repo sync 会找不到。
-# r21 仍是 6.6.77，hide_stuff 用主线 07，不用 scripts/test/（那是 6.6.139 用的）。
-# 不要跑 02、不要编 16K、不要刷 system_dlkm。
+# r21 仍是 6.6.77，hide_stuff 用主线 04，不用 scripts/test/（那是 6.6.139 用的）。
+# 不要编 16K、不要刷 system_dlkm。
 
 name: Build K90 GKI (test)
 
@@ -132,23 +132,23 @@ jobs:
       - name: Sync AOSP GKI (01)
         run: bash scripts/01-sync-aosp-gki.sh
 
-      - name: Apply SukiSU (03)
-        run: bash scripts/03-apply-sukisu.sh
+      - name: Apply SukiSU (02)
+        run: bash scripts/02-apply-sukisu.sh
 
-      - name: Apply SUSFS (06)
-        run: bash scripts/06-apply-susfs.sh
+      - name: Apply SUSFS (03)
+        run: bash scripts/03-apply-susfs.sh
 
-      - name: Apply ShirkNeko defaults (07)
-        run: bash scripts/07-apply-shirkneko-defaults.sh
+      - name: Apply ShirkNeko defaults (04)
+        run: bash scripts/04-apply-shirkneko-defaults.sh
 
-      - name: Build GKI (04)
-        run: bash scripts/04-build-gki.sh
+      - name: Build GKI (05)
+        run: bash scripts/05-build-gki.sh
 
-      - name: Pack AnyKernel3 (05)
-        run: bash scripts/05-pack-anykernel.sh
+      - name: Pack AnyKernel3 (06)
+        run: bash scripts/06-pack-anykernel.sh
 
-      - name: Patch KPM Image (08)
-        run: bash scripts/08-patch-kpm.sh
+      - name: Patch KPM Image (07)
+        run: bash scripts/07-patch-kpm.sh
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -164,9 +164,7 @@ jobs:
             out/aosp-test/Image.gz
             out/aosp-test/Image.lz4
             out/aosp-test/Image-kpm
-            out/aosp-test/Image-kpm.lz4
             out/aosp-test/boot-kpm.img
-            out/aosp-test/boot-kpm-lz4.img
             out/aosp-test/System.map
             out/SukiSU-annibale-aosp-*-4k-SUSFS-TEST-AnyKernel3.zip
             out/SukiSU-annibale-aosp-*-4k-SUSFS-TEST-KPM-AnyKernel3.zip

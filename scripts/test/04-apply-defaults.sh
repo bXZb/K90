@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test-only copy of 07. Do not use on the verified 6.6.77 tree.
+# Test-only copy of 04. Do not use on the verified 6.6.77 tree.
 # hide_stuff targets 6.6.139 show_map_vma (VMA_PAD_START / __VM_NO_COMPAT).
 set -euo pipefail
 

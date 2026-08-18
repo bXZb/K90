@@ -7,7 +7,7 @@
 已验证 `uname -r`：`6.6.77-android15-8-4k`  
 真机日志（当时在编译机上）：`/home/admin/log3/`
 
-**换新机器：只带 `SEED-FILES.txt` 列出的那些文件（或 `scripts/pack-seed.sh` 打出来的 tar.gz）。不要拷 `gki/`、`xiaomi/`、`out/`、`third_party/`，那些在新机器上重新拉、重新编。**
+构建以 GitHub 仓库 + Actions 为准。不要把 `gki/`、`out/`、`third_party/` 提交进仓库。
 
 ---
 
@@ -50,7 +50,7 @@ SukiSU/SUSFS 不必锁死某一个 commit，但分支不能错。换更新 commi
 
 ## 3. 怎么编（按这个顺序）
 
-工作根目录 `ROOT` = 本文件所在目录（解压 seed 后的那一层，里面有 `BUILD-K90-GKI.md`、`scripts/`、`configs/`）。
+工作根目录 `ROOT` = 本文件所在目录（clone 本仓库后的那一层，里面有 `BUILD-K90-GKI.md`、`scripts/`、`configs/`）。
 
 新机器要求：
 
@@ -62,39 +62,38 @@ SukiSU/SUSFS 不必锁死某一个 commit，但分支不能错。换更新 commi
 
 ### 3.1 同一台机器、树已经打过补丁，只重编
 
-不要跑 `01` / `03` / `06`。先跑一遍 `07`（幂等），再编：
+不要跑 `01` / `02` / `03`。先跑一遍 `04`（幂等），再编：
 
 ```bash
 cd "$ROOT"
-bash scripts/07-apply-shirkneko-defaults.sh
+bash scripts/04-apply-shirkneko-defaults.sh
 AOSP_DIST="$ROOT/out/aosp-release" BUILD_JOBS=3 LTO=thin \
-  bash scripts/04-build-gki.sh aosp
-bash scripts/05-pack-anykernel.sh
-bash scripts/08-patch-kpm.sh
+  bash scripts/05-build-gki.sh aosp
+bash scripts/06-pack-anykernel.sh
+bash scripts/07-patch-kpm.sh
 ```
 
-### 3.2 全新系统：解压 seed 之后从零拉源码
+### 3.2 全新系统：clone 本仓库之后从零拉源码
 
 ```bash
 cd "$ROOT"
 sudo bash scripts/00-install-deps.sh
 bash scripts/01-sync-aosp-gki.sh
-bash scripts/03-apply-sukisu.sh aosp
-bash scripts/06-apply-susfs.sh
-bash scripts/07-apply-shirkneko-defaults.sh
+bash scripts/02-apply-sukisu.sh aosp
+bash scripts/03-apply-susfs.sh
+bash scripts/04-apply-shirkneko-defaults.sh
 AOSP_DIST="$ROOT/out/aosp-release" BUILD_JOBS=3 LTO=thin \
-  bash scripts/04-build-gki.sh aosp
-bash scripts/05-pack-anykernel.sh
-bash scripts/08-patch-kpm.sh
+  bash scripts/05-build-gki.sh aosp
+bash scripts/06-pack-anykernel.sh
+bash scripts/07-patch-kpm.sh
 ```
 
-顺序不能乱：`03` 把 SukiSU 停在 `main`，`06` 才切到 `builtin` 并打 SUSFS，`07` 才做 RFKILL 清单 / hide_stuff / 去 dirty。只跑 `03`+`06` 就编，**bazel 会在缺 `rfkill.ko` 时失败**，或者编出 WiFi/蓝牙仍坏的包。
+顺序不能乱：`02` 把 SukiSU 停在 `main`，`03` 才切到 `builtin` 并打 SUSFS，`04` 才做 RFKILL 清单 / hide_stuff / 去 dirty。只跑 `02`+`03` 就编，**bazel 会在缺 `rfkill.ko` 时失败**，或者编出 WiFi/蓝牙仍坏的包。
 
 ### 3.3 绝对不要
 
 - **不要对已经打过补丁的树再跑 `01-sync-aosp-gki.sh`。**  
   它会对 `gki/common` 执行 `git checkout --detach` 到干净 r15，本地 SUSFS / hide_stuff / defconfig 改动会被丢掉或 checkout 失败。
-- 不要跑 `02-fetch-xiaomi.sh` 当主路径。`xiaomi/` 是 6.6.57 OSS，缺 hwid / vendor DTS，不是这台现网 6.6.77。
 - 不要编 `//common:kernel_aarch64_16k`。
 - 不要刷 `out/aosp-release/system_dlkm*.img`。只换 Image / boot。
 - 不要用网上通用 6.6.x GKI，这台会闪屏。
@@ -119,7 +118,7 @@ bash scripts/08-patch-kpm.sh
 | `gki/build/kernel/kleaf/impl/stamp.bzl` | `echo '-g4a507830d890'`，不是 `echo '-maybe-dirty'` |
 | `gki/common/fs/proc/task_mmu.c` | 有 `show_vma_header_prefix_fake` 和 `jit-zygote-cache` |
 
-`07` 会把后几条自动补上。
+`04` 会把后几条自动补上。
 
 ---
 
@@ -129,15 +128,14 @@ bash scripts/08-patch-kpm.sh
 |---|---|---|
 | `00-install-deps.sh` | `apt-get` 装 git/repo/编译依赖。要用 **`sudo bash`**，脚本内部自己不 sudo | 不装 bazel（用 `gki/tools/bazel`） |
 | `01-sync-aosp-gki.sh` | `repo init` 分支 `common-android15-6.6`，sync，再把 `common` detach 到 tag `android15-6.6-2025-03_r15` | **会重置 common** |
-| `02-fetch-xiaomi.sh` | 拉小米 OSS | 主路径不用 |
-| `03-apply-sukisu.sh aosp` | `setup.sh` + checkout **`main`**，再把 `configs/sukisu.fragment` 合进 defconfig（含 `KSU`/`KPM`/`RFKILL=y`，也会写入 `KSU_MANUAL_SU`） | 没有 SUSFS；SukiSU 还停在 `main` |
-| `04-build-gki.sh aosp` | 在 `gki/` 里 `tools/bazel run --lto=thin //common:kernel_aarch64_dist`，输出到 `AOSP_DIST`（默认 `out/aosp`） | **不再** merge fragment。AOSP 路径走 kleaf 自己的 clang，**不用** 脚本里的 `find_clang_bin`（那个只给 xiaomi make 用） |
-| `05-pack-anykernel.sh` | WildPlus AK3 + 未压缩 `Image` | 不预打 KPM |
-| `08-patch-kpm.sh` | 管理器同款 `kpimg` + SukiSU **Linux** `kptools`（`-s 123`）补 `Image`，产出 `Image-kpm` / `boot-kpm.img` / `*-KPM-AnyKernel3.zip` | 不改未修补的 `Image` 和普通 AK3 zip；annibale 用未压缩 `boot.img`，不用 `boot-lz4` |
-| `06-apply-susfs.sh` | checkout SukiSU **`builtin`**，打 `susfs4ksu` 的 `50_add_susfs_in_gki-android15-6.6.patch`，追加 SUSFS defconfig，删掉 `KSU_MANUAL_SU`。有 `gki/common/.sukisu_susfs_applied` 就跳过 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
-| `07-apply-shirkneko-defaults.sh` | **落地** RFKILL=y、删 `rfkill.ko`、关 check_defconfig、TTL/HL、去 protected_exports、去 maybe-dirty、hide_stuff。可重复跑 | 不开 ZRAM/BBG/默认 BBR |
+| `02-apply-sukisu.sh aosp` | `setup.sh` + checkout **`main`**，再把 `configs/sukisu.fragment` 合进 defconfig（含 `KSU`/`KPM`/`RFKILL=y`，也会写入 `KSU_MANUAL_SU`） | 没有 SUSFS；SukiSU 还停在 `main` |
+| `03-apply-susfs.sh` | checkout SukiSU **`builtin`**，打 `susfs4ksu` 的 `50_add_susfs_in_gki-android15-6.6.patch`，追加 SUSFS defconfig，删掉 `KSU_MANUAL_SU`。有 `gki/common/.sukisu_susfs_applied` 就跳过 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
+| `04-apply-shirkneko-defaults.sh` | **落地** RFKILL=y、删 `rfkill.ko`、关 check_defconfig、TTL/HL、去 protected_exports、去 maybe-dirty、hide_stuff。可重复跑 | 不开 ZRAM/BBG/默认 BBR |
+| `05-build-gki.sh aosp` | 在 `gki/` 里 `tools/bazel run --lto=thin //common:kernel_aarch64_dist`，输出到 `AOSP_DIST`（默认 `out/aosp`） | **不再** merge fragment。AOSP 路径走 kleaf 自己的 clang，**不用** 脚本里的 `find_clang_bin`（那个只给 xiaomi make 用） |
+| `06-pack-anykernel.sh` | WildPlus AK3 + 未压缩 `Image` | 不预打 KPM |
+| `07-patch-kpm.sh` | Linux `kptools` + 管理器同款 `kpimg`（`-s 123`）补 `Image`，产出 `Image-kpm` / `boot-kpm.img` / `*-KPM-AnyKernel3.zip` | 不改未修补的 `Image` 和普通 AK3 zip；不打 `*-lz4` |
 
-`04` 成功日志里应有：
+`05` 成功日志里应有：
 
 ```
 -- SukiSU-Ultra: using SUSFS_INLINE_HOOK
@@ -161,12 +159,12 @@ bash scripts/08-patch-kpm.sh
 编进去之后，开机日志里官方 ko 报 `exports duplicate symbol rfkill_alloc (owned by kernel)` 是正常的，不要再去装分区那份。
 
 **SUSFS 必须 `builtin`**  
-`main` 没有 SUSFS。`03` 之后一定要 `06`。
+`main` 没有 SUSFS。`02` 之后一定要 `03`。
 
 **关掉 check_defconfig**  
-改了 `gki_defconfig` 以后，`gki/common/build.config.gki` 必须是 `POST_DEFCONFIG_CMDS=""`。`07` 会写。
+改了 `gki_defconfig` 以后，`gki/common/build.config.gki` 必须是 `POST_DEFCONFIG_CMDS=""`。`04` 会写。
 
-**ShirkNeko 默认 release 对齐（`07` 做的）**  
+**ShirkNeko 默认 release 对齐（`04` 做的）**  
 hide_stuff、TTL/HL、去掉 `-maybe-dirty`、去掉 `kernel_aarch64` 的 `protected_exports_list`。  
 他们默认 **不开** 的我们也不开：ZRAM LZ4KD、BBG、`CONFIG_DEFAULT_BBR=y`、一加补丁。  
 官方 GKI 里已经有 `CONFIG_TCP_CONG_BBR=y`，默认拥塞算法保持 cubic。  
@@ -248,55 +246,27 @@ getprop debug.device.bluetooth_state  # 1
 
 没有：ZRAM 魔改、BBG、默认 BBR、一加补丁、小米未开源 DTS/驱动。
 
-`configs/sukisu.fragment` 里的 `CONFIG_KSU_MANUAL_SU=y` 只对 `main` 有意义。`06` 切到 `builtin` 后会删掉。不要再加回去。
+`configs/sukisu.fragment` 里的 `CONFIG_KSU_MANUAL_SU=y` 只对 `main` 有意义。`03` 切到 `builtin` 后会删掉。不要再加回去。
 
 ---
 
-## 11. 换机器要带走什么
+## 11. 仓库里不要放什么
 
-**只要 seed，不要整棵源码树。** 源码、clang、bazel、SUSFS 仓库、AnyKernel3 都在新机器上按脚本重新拉。
+构建以这个 GitHub 仓库 + Actions 为准。源码、clang、bazel、SUSFS、AnyKernel3 都在 runner 上按脚本重新拉。
 
-带走这些（或直接拷 `scripts/pack-seed.sh` 生成的 `out/k90-gki-seed-*.tar.gz`）：
-
-```
-BUILD-K90-GKI.md
-README.md
-SEED-FILES.txt
-configs/sukisu.fragment
-scripts/00-install-deps.sh
-scripts/01-sync-aosp-gki.sh
-scripts/02-fetch-xiaomi.sh
-scripts/03-apply-sukisu.sh
-scripts/04-build-gki.sh
-scripts/05-pack-anykernel.sh
-scripts/06-apply-susfs.sh
-scripts/07-apply-shirkneko-defaults.sh
-scripts/pack-seed.sh
-scripts/lib/apply_hide_stuff.py
-```
-
-不要带：
+不要提交：
 
 | 路径 | 原因 |
 |---|---|
 | `gki/` | AOSP 整树，几十 GB，`01` 会重新 sync |
-| `xiaomi/` | 主路径不用 |
-| `third_party/` | `06`/`05` 会重新 clone |
-| `out/` | 产物；新机器重新编。可选另存一份 `boot.img` 当对照，不是构建输入 |
-| `/home/admin/log*` | 旧日志，不是构建输入 |
-
-新机器：
-
-```bash
-mkdir -p ~/android && tar -C ~/android -xzf k90-gki-seed-*.tar.gz
-export ROOT=~/android
-# 然后跑第 3.2 节
-```
+| `third_party/` | `03`/`06` 会重新 clone |
+| `out/` | 产物，每次构建重新生成 |
+| `logs/` | 本地日志，不是构建输入 |
 
 ## 12. 给下次的最短指令
 
-1. 新机器：解压 seed，跑第 3.2 节（七条命令一行不要少）。
+1. 新机器：clone 本仓库，跑第 3.2 节（命令一行不要少）。
 2. 旧机器已有打过补丁的 `gki/common`：跑第 3.1 节。
 3. 用第 4 节表核对。
 4. `fastboot boot "$ROOT/out/aosp-release/boot.img"`，按第 8 节验收。
-5. 不要重跑 `01`，不要编 16K，不要刷 system_dlkm，不要走小米 OSS。
+5. 不要重跑 `01`，不要编 16K，不要刷 system_dlkm。

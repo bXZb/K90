@@ -8,30 +8,12 @@ DIST="${AOSP_DIST:-${ROOT}/out/${VARIANT}}"
 AK_DIR="${ROOT}/third_party/AnyKernel3"
 STAGE="${ROOT}/out/ak3-${VARIANT}"
 
-case "${VARIANT}" in
-  *[!A-Za-z0-9._-]*) echo "unsafe AOSP_VARIANT=${VARIANT}" >&2; exit 1 ;;
-esac
-case "${CHANNEL}" in
-  *[!A-Za-z0-9._-]*) echo "unsafe AK3_CHANNEL=${CHANNEL}" >&2; exit 1 ;;
-esac
-
-KVER="$(awk '
-  /^VERSION[[:space:]]*=/ { v=$3 }
-  /^PATCHLEVEL[[:space:]]*=/ { p=$3 }
-  /^SUBLEVEL[[:space:]]*=/ { s=$3 }
-  END {
-    if (v == "" || p == "" || s == "") exit 1
-    if (v !~ /^[0-9]+$/ || p !~ /^[0-9]+$/ || s !~ /^[0-9]+$/) exit 1
-    print v "." p "." s
-  }
-' "${ROOT}/gki/common/Makefile")"
+KVER="$(awk '/^VERSION =/{v=$3} /^PATCHLEVEL =/{p=$3} /^SUBLEVEL =/{s=$3} END{print v"."p"."s}' \
+  "${ROOT}/gki/common/Makefile")"
 VER="${KVER}+SUSFS+RFKILL+${CHANNEL}"
 ZIP_NAME="${AK3_ZIP_NAME:-SukiSU-annibale-aosp-${KVER}-4k-SUSFS-${CHANNEL}-AnyKernel3.zip}"
 KERNEL_STRING="SukiSU Ultra GKI ${VER} 4k for REDMI K90 (annibale)"
 
-case "${ZIP_NAME}" in
-  *[!A-Za-z0-9._+-]*|/*|*..*) echo "unsafe AK3_ZIP_NAME=${ZIP_NAME}" >&2; exit 1 ;;
-esac
 case "${AK_DIR}" in
   "${ROOT}"/third_party/*) ;;
   *) echo "refuse rm outside seed tree: ${AK_DIR}" >&2; exit 1 ;;
@@ -50,10 +32,6 @@ rm -rf -- "${STAGE}"
 mkdir -p -- "${STAGE}"
 rsync -a --exclude='.git' --exclude='*.zip' "${AK_DIR}/" "${STAGE}/"
 rm -f -- "${STAGE}"/Image* "${STAGE}"/*.zip "${STAGE}/banner"
-if [[ ! -f "${DIST}/Image" ]]; then
-  echo "missing ${DIST}/Image (need uncompressed Image, not only Image.lz4)" >&2
-  exit 1
-fi
 cp -f -- "${DIST}/Image" "${STAGE}/Image"
 
 # 官方 anykernel.sh 骨架 + LKM su 下用 sysfs 解析 boot 绝对路径。
@@ -252,14 +230,7 @@ EOF
 python3 -c '
 import pathlib, sys
 p = pathlib.Path(sys.argv[1])
-text = p.read_text(encoding="utf-8")
-old = "KERNEL_STRING_PLACEHOLDER"
-new = sys.argv[2]
-if old not in text:
-    raise SystemExit("placeholder missing")
-if "\n" in new or "\r" in new or "'"'"'" in new:
-    raise SystemExit("unsafe kernel.string")
-p.write_text(text.replace(old, new, 1), encoding="utf-8")
+p.write_text(p.read_text(encoding="utf-8").replace("KERNEL_STRING_PLACEHOLDER", sys.argv[2], 1), encoding="utf-8")
 ' "${STAGE}/anykernel.sh" "${KERNEL_STRING}"
 
 (
