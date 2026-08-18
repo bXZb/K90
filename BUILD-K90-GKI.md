@@ -2,8 +2,8 @@
 
 下次编译先读这份。按第 3 节命令顺序做，可以编出已在真机验证过的包。不要按旧 `README.md` 的「只加 SukiSU、不加 SUSFS」流程。
 
-已验证产物：`out/aosp-release/boot-lz4.img`  
-已验证启动：`fastboot boot`（不是 flash，也还没在真机上试 AnyKernel3 zip）  
+已验证产物：`out/aosp-release/boot.img`（未压缩 Image）  
+已验证启动：`fastboot boot boot.img`（`boot-lz4.img` / `boot-kpm-lz4.img` 在 annibale 上不能引导）  
 已验证 `uname -r`：`6.6.77-android15-8-4k`  
 真机日志（当时在编译机上）：`/home/admin/log3/`
 
@@ -133,7 +133,7 @@ bash scripts/08-patch-kpm.sh
 | `03-apply-sukisu.sh aosp` | `setup.sh` + checkout **`main`**，再把 `configs/sukisu.fragment` 合进 defconfig（含 `KSU`/`KPM`/`RFKILL=y`，也会写入 `KSU_MANUAL_SU`） | 没有 SUSFS；SukiSU 还停在 `main` |
 | `04-build-gki.sh aosp` | 在 `gki/` 里 `tools/bazel run --lto=thin //common:kernel_aarch64_dist`，输出到 `AOSP_DIST`（默认 `out/aosp`） | **不再** merge fragment。AOSP 路径走 kleaf 自己的 clang，**不用** 脚本里的 `find_clang_bin`（那个只给 xiaomi make 用） |
 | `05-pack-anykernel.sh` | WildPlus AK3 + 未压缩 `Image` | 不预打 KPM |
-| `08-patch-kpm.sh` | 管理器同款 `kpimg` + SukiSU **Linux** `kptools`（`-s 123`）补 `Image`，产出 `Image-kpm` / `boot-kpm-lz4.img` / `*-KPM-AnyKernel3.zip` | 不改未修补的 `Image` 和普通 AK3 zip；不用 Android 版 `kptools` |
+| `08-patch-kpm.sh` | 管理器同款 `kpimg` + SukiSU **Linux** `kptools`（`-s 123`）补 `Image`，产出 `Image-kpm` / `boot-kpm.img` / `*-KPM-AnyKernel3.zip` | 不改未修补的 `Image` 和普通 AK3 zip；annibale 用未压缩 `boot.img`，不用 `boot-lz4` |
 | `06-apply-susfs.sh` | checkout SukiSU **`builtin`**，打 `susfs4ksu` 的 `50_add_susfs_in_gki-android15-6.6.patch`，追加 SUSFS defconfig，删掉 `KSU_MANUAL_SU`。有 `gki/common/.sukisu_susfs_applied` 就跳过 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
 | `07-apply-shirkneko-defaults.sh` | **落地** RFKILL=y、删 `rfkill.ko`、关 check_defconfig、TTL/HL、去 protected_exports、去 maybe-dirty、hide_stuff。可重复跑 | 不开 ZRAM/BBG/默认 BBR |
 
@@ -183,9 +183,10 @@ hide_stuff、TTL/HL、去掉 `-maybe-dirty`、去掉 `kernel_aarch64` 的 `prote
 ## 7. 产物
 
 ```
-out/aosp-release/boot-lz4.img          ← 真机验证用这个
+out/aosp-release/boot.img              ← 真机验证用这个（未压缩）
+out/aosp-release/boot-kpm.img          ← 已打 KPM，同样 fastboot boot
+out/aosp-release/boot-lz4.img          ← AOSP 也打，annibale 上不能引导
 out/aosp-release/boot-gz.img
-out/aosp-release/boot.img
 out/aosp-release/Image
 out/aosp-release/Image.gz
 out/aosp-release/Image.lz4
@@ -205,7 +206,7 @@ out/SukiSU-annibale-aosp-6.6.77-4k-SUSFS-REL-AnyKernel3.zip
 ## 8. 验收
 
 ```bash
-fastboot boot "$ROOT/out/aosp-release/boot-lz4.img"
+fastboot boot "$ROOT/out/aosp-release/boot.img"
 ```
 
 ```text
@@ -225,7 +226,7 @@ getprop debug.device.bluetooth_state  # 1
 
 用户侧：WiFi 能开能连，蓝牙能开，震动不是高频乱震，SukiSU 显示工作中。
 
-长期再用 AnyKernel3 或 `fastboot flash boot`。先备份官方 `boot.img`。zip 还没在这台机上刷过，优先继续用 `boot-lz4.img` 验证。
+长期再用 AnyKernel3 或 `fastboot flash boot`。先备份官方 `boot.img`。zip 还没在这台机上刷过，优先继续用未压缩 `boot.img` 验证。
 
 ---
 
@@ -281,7 +282,7 @@ scripts/lib/apply_hide_stuff.py
 | `gki/` | AOSP 整树，几十 GB，`01` 会重新 sync |
 | `xiaomi/` | 主路径不用 |
 | `third_party/` | `06`/`05` 会重新 clone |
-| `out/` | 产物；新机器重新编。可选另存一份 `boot-lz4.img` 当对照，不是构建输入 |
+| `out/` | 产物；新机器重新编。可选另存一份 `boot.img` 当对照，不是构建输入 |
 | `/home/admin/log*` | 旧日志，不是构建输入 |
 
 新机器：
@@ -297,5 +298,5 @@ export ROOT=~/android
 1. 新机器：解压 seed，跑第 3.2 节（七条命令一行不要少）。
 2. 旧机器已有打过补丁的 `gki/common`：跑第 3.1 节。
 3. 用第 4 节表核对。
-4. `fastboot boot "$ROOT/out/aosp-release/boot-lz4.img"`，按第 8 节验收。
+4. `fastboot boot "$ROOT/out/aosp-release/boot.img"`，按第 8 节验收。
 5. 不要重跑 `01`，不要编 16K，不要刷 system_dlkm，不要走小米 OSS。

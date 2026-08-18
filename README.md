@@ -6,8 +6,8 @@
 
 当前已验证可用的产物：
 
-- 临时启动：`out/aosp-release/boot-lz4.img`
-- 临时启动（已打 KPM）：`out/aosp-release/boot-kpm-lz4.img`
+- 临时启动：`out/aosp-release/boot.img`（未压缩 Image；`boot-lz4.img` 在这台机上不能 `fastboot boot`）
+- 临时启动（已打 KPM）：`out/aosp-release/boot-kpm.img`
 - AnyKernel3：`out/SukiSU-annibale-aosp-6.6.77-4k-SUSFS-REL-AnyKernel3.zip`
 - AnyKernel3（已打 KPM）：`out/SukiSU-annibale-aosp-6.6.77-4k-SUSFS-REL-KPM-AnyKernel3.zip`
 

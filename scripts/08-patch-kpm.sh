@@ -255,11 +255,16 @@ print(f"rebuilt {sys.argv[2]} size {len(dst)} AVBf ok")
 PY
 }
 
-if [[ -f "${DIST}/boot-lz4.img" ]]; then
-  rebuild_boot_kpm "${DIST}/boot-lz4.img" "${DIST}/boot-kpm-lz4.img" "${DIST}/Image-kpm.lz4"
-elif [[ -f "${DIST}/boot.img" ]]; then
+# annibale 上已验证：fastboot boot 只能用未压缩 boot.img（内核是 MZ/Image）。
+# boot-lz4.img / boot-kpm-lz4.img 在这台机上进不去，包括未打 kpimg 的 REL-3。
+if [[ -f "${DIST}/boot.img" ]]; then
   rebuild_boot_kpm "${DIST}/boot.img" "${DIST}/boot-kpm.img" "${DIST}/Image-kpm"
-else
+fi
+if [[ -f "${DIST}/boot-lz4.img" ]]; then
+  rebuild_boot_kpm "${DIST}/boot-lz4.img" "${DIST}/boot-kpm-lz4.img" "${DIST}/Image-kpm.lz4" \
+    || echo "warn: boot-kpm-lz4.img rebuild failed (not used on annibale)"
+fi
+if [[ ! -f "${DIST}/boot-kpm.img" && ! -f "${DIST}/boot-kpm-lz4.img" ]]; then
   echo "no boot.img/boot-lz4.img; skip boot-kpm"
 fi
 
