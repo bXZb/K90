@@ -23,10 +23,10 @@ case "${STAGE}" in
   *) echo "refuse rm outside seed tree: ${STAGE}" >&2; exit 1 ;;
 esac
 
-# 官方 v2.2.0：WildPlusKernel/AnyKernel3 @ gki-2.0，默认 zip 只放未压缩 Image。
+# 官方 v2.2.0：WildKernels/AnyKernel3 @ gki-2.0，默认 zip 只放未压缩 Image。
 rm -rf -- "${AK_DIR}"
 git clone --depth=1 --branch gki-2.0 \
-  https://github.com/WildPlusKernel/AnyKernel3.git "${AK_DIR}"
+  https://github.com/WildKernels/AnyKernel3.git "${AK_DIR}"
 
 rm -rf -- "${STAGE}"
 mkdir -p -- "${STAGE}"

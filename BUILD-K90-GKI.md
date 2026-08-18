@@ -132,7 +132,7 @@ bash scripts/07-patch-kpm.sh
 | `03-apply-susfs.sh` | checkout SukiSU **`builtin`**，打 `susfs4ksu` 的 `50_add_susfs_in_gki-android15-6.6.patch`，追加 SUSFS defconfig，删掉 `KSU_MANUAL_SU`。有 `gki/common/.sukisu_susfs_applied` 就跳过 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
 | `04-apply-shirkneko-defaults.sh` | **落地** RFKILL=y、删 `rfkill.ko`、关 check_defconfig、TTL/HL、去 protected_exports、去 maybe-dirty、hide_stuff。可重复跑 | 不开 ZRAM/BBG/默认 BBR |
 | `05-build-gki.sh aosp` | 在 `gki/` 里 `tools/bazel run --lto=thin //common:kernel_aarch64_dist`，输出到 `AOSP_DIST`（默认 `out/aosp`） | **不再** merge fragment。AOSP 路径走 kleaf 自己的 clang，**不用** 脚本里的 `find_clang_bin`（那个只给 xiaomi make 用） |
-| `06-pack-anykernel.sh` | WildPlus AK3 + 未压缩 `Image` | 不预打 KPM |
+| `06-pack-anykernel.sh` | WildKernels AK3 + 未压缩 `Image` | 不预打 KPM |
 | `07-patch-kpm.sh` | Linux `kptools` + 管理器同款 `kpimg`（`-s 123`）补 `Image`，产出 `Image-kpm` / `boot-kpm.img` / `*-KPM-AnyKernel3.zip` | 不改未修补的 `Image` 和普通 AK3 zip；不打 `*-lz4` |
 
 `05` 成功日志里应有：
