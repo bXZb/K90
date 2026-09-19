@@ -54,8 +54,19 @@ patch -p1 --forward --fuzz=3 \
 # + K90 fixup（3 处修正：init.c 手工移植、保留 symbol_resolver、selinux_hide
 #   的 -Werror 写法；详见 patch 头部说明）。
 if [ "${KSU_FLAVOR}" = "main-susfs" ]; then
+  # 10_ 的 core/init.c 有 3 个 hunk 与 main HEAD 漂移，预期失败并落 .rej；
+  # 放行后校验拒绝范围，再由 fixup 提供这三处的正确内容。
   patch -p1 --forward --fuzz=3 -d "${KSU}" \
-    < "${SUSFS_DIR}/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+    < "${SUSFS_DIR}/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch" \
+    || true
+  bad_rejs=$(find "${KSU}" -name "*.rej" ! -name "init.c.rej")
+  if [ -n "${bad_rejs}" ]; then
+    echo "10_ 出现预期之外的 .rej（上游补丁或 main 又漂移了）：" >&2
+    echo "${bad_rejs}" >&2
+    exit 1
+  fi
+  find "${KSU}" -name "*.rej" -delete
+  find "${KSU}" -name "*.orig" -delete
   patch -p1 --forward -d "${KSU}" \
     < "${ROOT}/configs/sukisu-main-k90-fixup.patch"
 fi
