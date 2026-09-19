@@ -20,7 +20,3 @@ if ! command -v repo >/dev/null 2>&1; then
     -o /usr/local/bin/repo
   chmod a+x /usr/local/bin/repo
 fi
-
-git config --global user.name "gki-builder"
-git config --global user.email "gki-builder@localhost"
-git config --global color.ui false

@@ -41,7 +41,6 @@ on:
       - "v*"
     branches:
       - main
-      - master
     paths:
       - "scripts/**"
       - "configs/**"

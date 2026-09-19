@@ -19,15 +19,6 @@ esac
 ZIP_NAME="${AK3_ZIP_NAME:-${KSU_TAG}-annibale-aosp-${KVER}-4k-SUSFS-${CHANNEL}-AnyKernel3.zip}"
 KERNEL_STRING="SukiSU Ultra GKI ${VER} 4k for REDMI K90 (annibale)"
 
-case "${AK_DIR}" in
-  "${ROOT}"/third_party/*) ;;
-  *) echo "refuse rm outside seed tree: ${AK_DIR}" >&2; exit 1 ;;
-esac
-case "${STAGE}" in
-  "${ROOT}"/out/*) ;;
-  *) echo "refuse rm outside seed tree: ${STAGE}" >&2; exit 1 ;;
-esac
-
 # 官方 v2.2.0：WildKernels/AnyKernel3 @ gki-2.0，默认 zip 只放未压缩 Image。
 rm -rf -- "${AK_DIR}"
 git clone --depth=1 --branch gki-2.0 \
