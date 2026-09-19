@@ -1,0 +1,38 @@
+K90 builtin flavor: no-op ksu_handle_post_execveat_sucompat stub
+
+susfs4ksu d4ea3dd76 (2026-09-12) made the 50_ kernel patch reference
+ksu_handle_post_execveat_sucompat, which only the main+10_ driver provides.
+builtin grants root in the pre-execve hook, so this stub exists purely
+to satisfy the kernel-side reference. Regenerate against builtin HEAD
+if it stops applying.
+
+@@ -382,3 +382,19 @@
+ {
+     ksu_unregister_feature_handler(KSU_FEATURE_SU_COMPAT);
+ }
++
++/*
++ * The SUSFS kernel patch (50_add_susfs) references this after a successful
++ * execve of a su session. The main-branch driver installs the su session fd
++ * here (scoped-capability model); the builtin driver already granted root in
++ * the pre-execve hook, so there is nothing to do. Exists to satisfy the
++ * kernel-side reference.
++ */
++#ifdef CONFIG_KSU_SUSFS
++int ksu_handle_post_execveat_sucompat(int *fd, struct filename **filename_ptr,
++                      void *argv_user, void *envp_user,
++                      int *__never_use_flags, int *retval)
++{
++    return 0;
++}
++#endif
+@@ -12,6 +12,9 @@
+ int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
+                  void *argv_user, void *envp_user,
+                  int *__never_use_flags);
++int ksu_handle_post_execveat_sucompat(int *fd, struct filename **filename_ptr,
++			      void *argv_user, void *envp_user,
++			      int *__never_use_flags, int *retval);
+ #else
+ int ksu_handle_faccessat(int *dfd, const char __user **filename_user, int *mode, int *__unused_flags);
+ int ksu_handle_stat(int *dfd, const char __user **filename_user, int *flags);

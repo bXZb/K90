@@ -15,6 +15,11 @@ case "${KSU_FLAVOR}" in
   builtin)
     git -C "${KSU}" fetch origin builtin
     git -C "${KSU}" checkout -B builtin origin/builtin
+    # susfs4ksu d4ea3dd76（09-12）起，50_ 补丁引用 ksu_handle_post_execveat_sucompat，
+    # 该符号只有 main+10_ 驱动提供。builtin 在 pre-execve hook 已完成授权，
+    # 打 no-op stub 满足内核侧引用即可。若上游改动 sucompat.c 导致补丁失配，需重生成。
+    patch -p1 --forward --fuzz=3 -d "${KSU}" \
+      < "${ROOT}/configs/builtin-post-execveat-stub.patch"
     SUSFS_COMMIT="${SUSFS_COMMIT:-}"
     ;;
   main-susfs)
