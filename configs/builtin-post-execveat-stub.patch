@@ -6,6 +6,8 @@ builtin grants root in the pre-execve hook, so this stub exists purely
 to satisfy the kernel-side reference. Regenerate against builtin HEAD
 if it stops applying.
 
+--- a/kernel/feature/sucompat.c	2026-09-19 14:19:49.688762500 +0800
++++ b/kernel/feature/sucompat.c	2026-09-19 14:19:50.758837500 +0800
 @@ -382,3 +382,19 @@
  {
      ksu_unregister_feature_handler(KSU_FEATURE_SU_COMPAT);
@@ -26,6 +28,8 @@ if it stops applying.
 +    return 0;
 +}
 +#endif
+--- a/kernel/feature/sucompat.h	2026-09-19 14:19:50.708335100 +0800
++++ b/kernel/feature/sucompat.h	2026-09-19 14:19:50.759838400 +0800
 @@ -12,6 +12,9 @@
  int ksu_handle_execveat_sucompat(int *fd, struct filename **filename_ptr,
                   void *argv_user, void *envp_user,
