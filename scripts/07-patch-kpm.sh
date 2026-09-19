@@ -18,7 +18,11 @@ AVBTOOL="${ROOT}/gki/prebuilts/kernel-build-tools/linux-x86/bin/avbtool"
 
 KVER="$(awk '/^VERSION =/{v=$3} /^PATCHLEVEL =/{p=$3} /^SUBLEVEL =/{s=$3} END{print v"."p"."s}' \
   "${ROOT}/gki/common/Makefile")"
-KPM_ZIP_NAME="${KPM_AK3_ZIP_NAME:-SukiSU-annibale-aosp-${KVER}-4k-SUSFS-${CHANNEL}-KPM-AnyKernel3.zip}"
+case "${KSU_FLAVOR:-builtin}" in
+  main-susfs) KSU_TAG="SukiSU-Main" ;;
+  *)          KSU_TAG="SukiSU" ;;
+esac
+KPM_ZIP_NAME="${KPM_AK3_ZIP_NAME:-${KSU_TAG}-annibale-aosp-${KVER}-4k-SUSFS-${CHANNEL}-KPM-AnyKernel3.zip}"
 
 rm -rf "${WORK}"
 mkdir -p "${TOOLS}" "${WORK}"

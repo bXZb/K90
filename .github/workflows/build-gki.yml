@@ -25,6 +25,13 @@ on:
         description: "bazel --jobs（auto = 按 CPU/内存估算）"
         type: string
         default: auto
+      ksu:
+        description: "KernelSU 变体（builtin = 已验证默认；main-susfs = 实验性 main+ShirkNeko 补丁流程，无 KPM 保证，未真机验证）"
+        type: choice
+        default: builtin
+        options:
+          - builtin
+          - main-susfs
       create_release:
         description: "构建成功后发布 GitHub Release"
         type: boolean
@@ -61,6 +68,7 @@ jobs:
     env:
       LTO: ${{ github.event.inputs.lto || 'thin' }}
       BUILD_JOBS: ${{ github.event.inputs.jobs || 'auto' }}
+      KSU_FLAVOR: ${{ github.event.inputs.ksu || 'builtin' }}
 
     steps:
       - name: Checkout seed
@@ -132,7 +140,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: SukiSU-annibale-aosp-6.6.77-4k-SUSFS-REL-${{ github.run_number }}
+          name: ${{ github.event.inputs.ksu == 'main-susfs' && 'SukiSU-Main-annibale-aosp-6.6.77-4k-SUSFS-REL-' || 'SukiSU-annibale-aosp-6.6.77-4k-SUSFS-REL-' }}${{ github.run_number }}
           if-no-files-found: error
           retention-days: 30
           path: |
@@ -145,8 +153,8 @@ jobs:
             out/aosp-release/Image-kpm
             out/aosp-release/boot-kpm.img
             out/aosp-release/System.map
-            out/SukiSU-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
-            out/SukiSU-annibale-aosp-*-4k-SUSFS-REL-KPM-AnyKernel3.zip
+            out/SukiSU*-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
+            out/SukiSU*-annibale-aosp-*-4k-SUSFS-REL-KPM-AnyKernel3.zip
 
       - name: Publish GitHub Release
         if: ${{ github.ref_type == 'tag' || inputs.create_release }}
@@ -158,6 +166,7 @@ jobs:
           body: |
             REDMI K90 (`annibale`) AOSP GKI **${{ env.EXPECTED_UNAME }}**
             + 内置 SukiSU/KPM + SUSFS + `RFKILL=y`。
+            ${{ github.event.inputs.ksu == 'main-susfs' && '\n> ⚠️ 变体：SukiSU main + ShirkNeko 10_/50_ 补丁流程（实验性，未经真机验证）\n' || '' }}
 
             优先临时启动（已验证路径）：
 
@@ -170,5 +179,5 @@ jobs:
           files: |
             out/aosp-release/boot.img
             out/aosp-release/boot-kpm.img
-            out/SukiSU-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
-            out/SukiSU-annibale-aosp-*-4k-SUSFS-REL-KPM-AnyKernel3.zip
+            out/SukiSU*-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
+            out/SukiSU*-annibale-aosp-*-4k-SUSFS-REL-KPM-AnyKernel3.zip
