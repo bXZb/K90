@@ -2,7 +2,8 @@
 set -euo pipefail
 
 # KSU_FLAVOR=builtin    (默认) 切 SukiSU builtin 分支；susfs4ksu 跟踪分支 (--depth=1)
-# KSU_FLAVOR=main-susfs (实验) 不切分支（02 已装 vendored main+10_）；susfs4ksu pin 固定 commit
+# KSU_FLAVOR=main-susfs (实验) 不切分支（02 已装上游 main pin）；susfs4ksu pin 固定 commit，
+#                       驱动侧打上游 10_ + configs/sukisu-main-k90-fixup.patch
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 COMMON="${ROOT}/gki/common"
@@ -48,6 +49,16 @@ cp -a "${SUSFS_DIR}/kernel_patches/include/linux/." "${COMMON}/include/linux/"
 cd "${COMMON}"
 patch -p1 --forward --fuzz=3 \
   < "${SUSFS_DIR}/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch"
+
+# main-susfs：驱动侧再打上游 10_（拆 syscall-hook、装 SUSFS inline hook）
+# + K90 fixup（3 处修正：init.c 手工移植、保留 symbol_resolver、selinux_hide
+#   的 -Werror 写法；详见 patch 头部说明）。
+if [ "${KSU_FLAVOR}" = "main-susfs" ]; then
+  patch -p1 --forward --fuzz=3 -d "${KSU}" \
+    < "${SUSFS_DIR}/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+  patch -p1 --forward -d "${KSU}" \
+    < "${ROOT}/configs/sukisu-main-k90-fixup.patch"
+fi
 
 DEFCONFIG="${COMMON}/arch/arm64/configs/gki_defconfig"
 if [ "${KSU_FLAVOR}" = "builtin" ]; then

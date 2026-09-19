@@ -2,10 +2,9 @@
 set -euo pipefail
 
 # KSU_FLAVOR=builtin    (默认, 已验证) 上游 setup.sh + 03 切 builtin 分支
-# KSU_FLAVOR=main-susfs (实验)        bXZb/SukiSU-Ultra 的 vendored 分支
-#                      susfs-main-k90 = main@7755cdb3 + ShirkNeko/susfs4ksu@9d9464f19
-#                      的 kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch
-#                      (init.c 3 个 hunk 手工移植, symbol_resolver 保留给 cpu_spoof)
+# KSU_FLAVOR=main-susfs (实验)        上游 main pin + 03 打上游 10_ 补丁 + K90 fixup
+#                      (main@7755cdb3 + susfs4ksu@9d9464f19 的
+#                      10_enable_susfs_for_ksu.patch + configs/sukisu-main-k90-fixup.patch)
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KERNEL_ROOT="${ROOT}/gki/common"
@@ -19,11 +18,11 @@ case "${KSU_FLAVOR}" in
       | bash -s main
     ;;
   main-susfs)
-    KSU_REPO="${KSU_REPO:-https://github.com/bXZb/SukiSU-Ultra.git}"
-    KSU_REF="${KSU_REF:-susfs-main-k90}"
+    # 上游 main，pin 固定 commit；10_/fixup 两个驱动补丁在 03 打（那里才有 susfs4ksu 克隆）。
+    KSU_REPO="${KSU_REPO:-https://github.com/SukiSU-Ultra/SukiSU-Ultra.git}"
+    KSU_COMMIT="${KSU_COMMIT:-7755cdb36f63945f286d7b1cab662b42b18f2789}"
     test -d KernelSU || git clone "${KSU_REPO}" KernelSU
-    git -C KernelSU fetch origin "${KSU_REF}"
-    git -C KernelSU checkout --detach "FETCH_HEAD"
+    git -C KernelSU checkout -q --detach "${KSU_COMMIT}"
     # 与上游 setup.sh 等价的驱动集成。
     DRIVER_DIR="${KERNEL_ROOT}/drivers"
     ln -sf "$(realpath --relative-to="${DRIVER_DIR}" "${KERNEL_ROOT}/KernelSU/kernel")" "${DRIVER_DIR}/kernelsu"
@@ -31,7 +30,7 @@ case "${KSU_FLAVOR}" in
       || printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "${DRIVER_DIR}/Makefile"
     grep -q 'source "drivers/kernelsu/Kconfig"' "${DRIVER_DIR}/Kconfig" \
       || sed -i '/endmenu/i\source "drivers/kernelsu/Kconfig"' "${DRIVER_DIR}/Kconfig"
-    echo "[+] SukiSU main-susfs (vendored susfs-main-k90) integrated"
+    echo "[+] SukiSU main @ ${KSU_COMMIT} integrated"
     ;;
   *)
     echo "unknown KSU_FLAVOR: ${KSU_FLAVOR} (builtin | main-susfs)" >&2
