@@ -168,7 +168,7 @@ bash scripts/07-patch-kpm.sh
 hide_stuff、TTL/HL、去掉 `-maybe-dirty`、去掉 `kernel_aarch64` 的 `protected_exports_list`。  
 他们默认 **不开** 的我们也不开：ZRAM LZ4KD、BBG、`CONFIG_DEFAULT_BBR=y`、一加补丁。  
 官方 GKI 里已经有 `CONFIG_TCP_CONG_BBR=y`，默认拥塞算法保持 cubic。  
-`AUTO_ADD_SUS_*` 会写入 defconfig；当前 `builtin` Kconfig 可能没有这些选项，写了会被忽略。
+`AUTO_ADD_SUS_*`、`TRY_UMOUNT`、`SUS_SU` 等键在 builtin 与 10_ 的 Kconfig 里都不存在，写了会被静默忽略——defconfig 里只保留真实生效的键（2026-09 起已清理）。
 
 **hide_stuff 不能直接套官方 patch**  
 `69_hide_stuff.patch` 基于旧 `task_mmu.c`，和现有 SUSFS 冲突。`scripts/lib/apply_hide_stuff.py` 是移植版：maps 里藏 `lineage` / `jit-zygote-cache`。

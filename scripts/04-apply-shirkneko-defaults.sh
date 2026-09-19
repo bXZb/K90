@@ -20,15 +20,14 @@ import sys
 p = Path(sys.argv[1])
 lines = p.read_text().splitlines()
 wanted = [
-    "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y",
-    "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y",
-    "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y",
     "CONFIG_IP_NF_TARGET_TTL=y",
     "CONFIG_IP6_NF_TARGET_HL=y",
     "CONFIG_IP6_NF_MATCH_HL=y",
     "CONFIG_NETFILTER_XT_TARGET_HL=y",
     "CONFIG_NETFILTER_XT_MATCH_HL=y",
 ]
+# 曾尝试写入的 KSU_SUSFS_AUTO_ADD_* 三个键在 builtin 与 10_ 的 Kconfig 里
+# 都不存在（写了被静默忽略），已删除；勿再加回。
 keys = {}
 for i, line in enumerate(lines):
     if not line or line.startswith("#") or "=" not in line:
