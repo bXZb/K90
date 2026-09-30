@@ -3,6 +3,10 @@ set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
+# Runner 镜像自带的 apt 索引可能落后于镜像源（旧版本 deb 被上游撤下，
+# 直接 install 会 404，见 run #29）。装之前先刷新索引。
+apt-get update
+
 apt-get install -y --no-install-recommends \
   git git-lfs curl wget unzip zip rsync patch \
   python3 python3-pip python3-setuptools \
