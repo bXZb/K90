@@ -7,3 +7,8 @@ CONFIG_KPROBES=y
 # CONFIG_KSU_DEBUG is not set
 # Vendor cfg80211/btpower need rfkill in vmlinux (stock rfkill.ko does not load on custom Image).
 CONFIG_RFKILL=y
+# Container runtimes (Droidspaces) need PID+IPC namespaces. GKI ships PID_NS
+# explicitly off; IPC_NS depends on SYSVIPC||POSIX_MQUEUE, both default-off.
+CONFIG_PID_NS=y
+CONFIG_SYSVIPC=y
+CONFIG_IPC_NS=y

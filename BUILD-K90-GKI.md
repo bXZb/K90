@@ -112,6 +112,7 @@ bash scripts/07-patch-kpm.sh
 | `git -C gki/common/KernelSU branch --show-current` | `builtin` |
 | `gki/common/include/linux/susfs.h` | 存在 |
 | `grep ^CONFIG_RFKILL= gki/common/arch/arm64/configs/gki_defconfig` | `CONFIG_RFKILL=y` |
+| `grep -e CONFIG_PID_NS= -e CONFIG_IPC_NS= -e CONFIG_SYSVIPC= gki/common/arch/arm64/configs/gki_defconfig` | 三条全 `=y`（原 `# CONFIG_PID_NS is not set` 被 02 原位替换） |
 | `grep rfkill.ko gki/common/modules.bzl` | **没有**输出 |
 | `gki/common/build.config.gki` | `POST_DEFCONFIG_CMDS=""` |
 | `gki/common/BUILD.bazel` 里 `"kernel_aarch64":` 那段 | **没有** `protected_exports_list` |
@@ -128,7 +129,7 @@ bash scripts/07-patch-kpm.sh
 |---|---|---|
 | `00-install-deps.sh` | `apt-get` 装 git/repo/编译依赖。要用 **`sudo bash`**，脚本内部自己不 sudo | 不装 bazel（用 `gki/tools/bazel`） |
 | `01-sync-aosp-gki.sh` | `repo init` 分支 `common-android15-6.6`，sync，再把 `common` detach 到 tag `android15-6.6-2025-03_r15` | **会重置 common** |
-| `02-apply-sukisu.sh aosp` | `setup.sh` + checkout **`main`**，再把 `configs/sukisu.fragment` 合进 defconfig（含 `KSU`/`KPM`/`RFKILL=y`，也会写入 `KSU_MANUAL_SU`） | 没有 SUSFS；SukiSU 还停在 `main` |
+| `02-apply-sukisu.sh aosp` | `setup.sh` + checkout **`main`**，再把 `configs/sukisu.fragment` 合进 defconfig（含 `KSU`/`KPM`/`RFKILL=y` 和容器要用的 `PID_NS`/`SYSVIPC`/`IPC_NS`，也会写入 `KSU_MANUAL_SU`） | 没有 SUSFS；SukiSU 还停在 `main` |
 | `03-apply-susfs.sh` | checkout SukiSU **`builtin`**，打 `susfs4ksu` 的 `50_add_susfs_in_gki-android15-6.6.patch`，追加 SUSFS defconfig，删掉 `KSU_MANUAL_SU`。有 `gki/common/.sukisu_susfs_applied` 就跳过 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
 | `04-apply-shirkneko-defaults.sh` | **落地** RFKILL=y、删 `rfkill.ko`、关 check_defconfig、TTL/HL、去 protected_exports、去 maybe-dirty、hide_stuff。可重复跑 | 不开 ZRAM/BBG/默认 BBR |
 | `05-build-gki.sh aosp` | 在 `gki/` 里 `tools/bazel run --lto=thin //common:kernel_aarch64_dist`，输出到 `AOSP_DIST`（默认 `out/aosp`） | **不再** merge fragment。AOSP 路径走 kleaf 自己的 clang，**不用** 脚本里的 `find_clang_bin`（那个只给 xiaomi make 用） |
@@ -242,7 +243,7 @@ getprop debug.device.bluetooth_state  # 1
 
 ## 10. 当前包里有什么
 
-有：6.6.77 4K 同代 GKI、内置 SukiSU+KPM+ADB Root、SUSFS（`SUS_PATH=n`、`SUS_SU=n`）、`RFKILL` 内置、hide_stuff、TTL/HL、BBR 编进内核但默认 cubic、uname 无 dirty、去掉 protected exports。
+有：6.6.77 4K 同代 GKI、内置 SukiSU+KPM+ADB Root、SUSFS（`SUS_PATH=n`、`SUS_SU=n`）、`RFKILL` 内置、hide_stuff、TTL/HL、BBR 编进内核但默认 cubic、uname 无 dirty、去掉 protected exports、PID/IPC namespace + SYSVIPC（Droidspaces/容器前置）。
 
 没有：ZRAM 魔改、BBG、默认 BBR、一加补丁、小米未开源 DTS/驱动。
 
