@@ -16,6 +16,17 @@ case "${KSU_FLAVOR}" in
   builtin)
     git -C "${KSU}" fetch origin builtin
     git -C "${KSU}" checkout -B builtin origin/builtin
+    # SukiSU-Ultra#974: kernel_includes.h 引用 arch.h，builtin 还没提交该文件。
+    if [ ! -f "${KSU}/kernel/arch.h" ]; then
+      cp "${ROOT}/configs/builtin-arch.h" "${KSU}/kernel/arch.h"
+    fi
+    # apply_kernelsu_rules() 函数作用域已声明 pol/old_pol，内层再声明一次会被
+    # GKI CONFIG_WERROR 判为重定义。#974 合进 builtin 后这行会消失，跳过即可。
+    if grep -q 'struct selinux_policy \*pol, \*old_pol = selinux_state.policy;' \
+      "${KSU}/kernel/selinux/rules.c"; then
+      patch -p1 --forward --fuzz=3 -d "${KSU}" \
+        < "${ROOT}/configs/builtin-selinux-redecl.patch"
+    fi
     # susfs4ksu d4ea3dd76（09-12）起，50_ 补丁引用 ksu_handle_post_execveat_sucompat。
     # builtin 在 pre-execve hook 已完成授权，打 no-op stub 满足内核侧引用即可。
     patch -p1 --forward --fuzz=3 -d "${KSU}" \
