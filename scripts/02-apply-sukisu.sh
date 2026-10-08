@@ -5,7 +5,7 @@ set -euo pipefail
 # KSU_FLAVOR=tag     检出官方 tag（默认 = SukiSU-Ultra 仓库最新 tag；KSU_TAG / KSU_COMMIT 可改）
 #
 # 两种 flavor 同构：克隆上游 + 驱动集成（symlink/Makefile/Kconfig）。
-# 官方 tag 的驱动没有 SUSFS Kconfig，03 不再打 10_ / K90 fixup。
+# 官方 tag 的驱动没有 SUSFS Kconfig。
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=lib/ksu_zip_prefix.sh
@@ -19,7 +19,7 @@ KSU_COMMIT="${KSU_COMMIT:-}"
 
 case "${KSU_FLAVOR}" in
   builtin) ;;
-  tag|main|main-susfs) KSU_FLAVOR=tag ;;
+  tag) ;;
   *)
     echo "unknown KSU_FLAVOR: ${KSU_FLAVOR} (builtin | tag)" >&2
     exit 1

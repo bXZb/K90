@@ -36,7 +36,7 @@ ksu_persist_tag() {
 
 ksu_zip_prefix() {
   case "${KSU_FLAVOR:-builtin}" in
-    tag|main|main-susfs)
+    tag)
       local t="${KSU_TAG:-}"
       if [ -z "${t}" ] && [ -n "${ROOT:-}" ] && [ -f "$(ksu_stamp_file)" ]; then
         t="$(tr -d '[:space:]' < "$(ksu_stamp_file)")"
