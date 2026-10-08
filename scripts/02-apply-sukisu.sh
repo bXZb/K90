@@ -2,31 +2,45 @@
 set -euo pipefail
 
 # KSU_FLAVOR=builtin (默认, 已验证) 克隆上游默认分支，03 再切 builtin
-# KSU_FLAVOR=main    检出官方 tag（默认 v4.2.0；KSU_TAG / KSU_COMMIT 可改）
+# KSU_FLAVOR=tag     检出官方 tag（默认 = SukiSU-Ultra 仓库最新 tag；KSU_TAG / KSU_COMMIT 可改）
 #
 # 两种 flavor 同构：克隆上游 + 驱动集成（symlink/Makefile/Kconfig）。
 # 官方 tag 的驱动没有 SUSFS Kconfig，03 不再打 10_ / K90 fixup。
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/ksu_zip_prefix.sh
+. "${ROOT}/scripts/lib/ksu_zip_prefix.sh"
+
 KERNEL_ROOT="${ROOT}/gki/common"
 KSU_FLAVOR="${KSU_FLAVOR:-builtin}"
 KSU_REPO="${KSU_REPO:-https://github.com/SukiSU-Ultra/SukiSU-Ultra.git}"
-KSU_TAG="${KSU_TAG:-v4.2.0}"
+KSU_TAG="${KSU_TAG:-}"
 KSU_COMMIT="${KSU_COMMIT:-}"
 
 case "${KSU_FLAVOR}" in
   builtin) ;;
-  main|main-susfs) KSU_FLAVOR=main ;;
+  tag|main|main-susfs) KSU_FLAVOR=tag ;;
   *)
-    echo "unknown KSU_FLAVOR: ${KSU_FLAVOR} (builtin | main)" >&2
+    echo "unknown KSU_FLAVOR: ${KSU_FLAVOR} (builtin | tag)" >&2
     exit 1
     ;;
 esac
 
 cd "${KERNEL_ROOT}"
+if [ "${KSU_FLAVOR}" = "tag" ]; then
+  if [ -n "${KSU_COMMIT}" ]; then
+    ref="${KSU_COMMIT}"
+  elif [ -n "${KSU_TAG}" ]; then
+    ref="${KSU_TAG}"
+  else
+    KSU_TAG="$(ksu_latest_tag "${KSU_REPO}")"
+    ref="${KSU_TAG}"
+    echo "[+] KSU_TAG empty; using latest ${KSU_TAG}"
+  fi
+fi
+
 if [ ! -d KernelSU ]; then
-  if [ "${KSU_FLAVOR}" = "main" ]; then
-    ref="${KSU_COMMIT:-${KSU_TAG}}"
+  if [ "${KSU_FLAVOR}" = "tag" ]; then
     if ! git clone --depth=1 --branch "${ref}" "${KSU_REPO}" KernelSU; then
       rm -rf KernelSU
       git clone --filter=blob:none "${KSU_REPO}" KernelSU
@@ -36,10 +50,13 @@ if [ ! -d KernelSU ]; then
   fi
 fi
 
-if [ "${KSU_FLAVOR}" = "main" ]; then
-  ref="${KSU_COMMIT:-${KSU_TAG}}"
+if [ "${KSU_FLAVOR}" = "tag" ]; then
   git -C KernelSU fetch --depth=1 origin "${ref}"
   git -C KernelSU checkout -q --detach FETCH_HEAD
+  if [ -z "${KSU_TAG}" ]; then
+    KSU_TAG="$(git -C KernelSU describe --tags --exact-match HEAD 2>/dev/null || printf '%s' "${ref}")"
+  fi
+  ksu_persist_tag
 fi
 
 DRIVER_DIR="${KERNEL_ROOT}/drivers"
@@ -50,8 +67,8 @@ grep -q 'source "drivers/kernelsu/Kconfig"' "${DRIVER_DIR}/Kconfig" \
   || sed -i '/endmenu/i\source "drivers/kernelsu/Kconfig"' "${DRIVER_DIR}/Kconfig"
 
 ksu_rev="$(git -C KernelSU rev-parse --short HEAD)"
-if [ "${KSU_FLAVOR}" = "main" ]; then
-  echo "[+] SukiSU integrated (main @ ${ksu_rev} / ${KSU_COMMIT:-${KSU_TAG}})"
+if [ "${KSU_FLAVOR}" = "tag" ]; then
+  echo "[+] SukiSU integrated (tag @ ${ksu_rev} / ${KSU_COMMIT:-${KSU_TAG}})"
 else
   echo "[+] SukiSU integrated (builtin prep @ ${ksu_rev}; 03 switches to builtin)"
 fi
