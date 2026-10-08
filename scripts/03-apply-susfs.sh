@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# KSU_FLAVOR=builtin (默认) 切 SukiSU builtin 分支，打 stub + 50_，打开 SUSFS Kconfig
+# KSU_FLAVOR=builtin (默认) 切 SukiSU builtin 分支，补上游缺口 + 50_，打开 SUSFS Kconfig
 # KSU_FLAVOR=tag     02 已检出官方 tag；只打 GKI 侧 50_（hide_stuff 需要）
 #                    官方 tag 没有 SUSFS 驱动菜单，50_ 的 ifdefs 保持关闭
 
@@ -27,10 +27,21 @@ case "${KSU_FLAVOR}" in
       patch -p1 --forward --fuzz=3 -d "${KSU}" \
         < "${ROOT}/configs/builtin-selinux-redecl.patch"
     fi
+    # official KernelSU #3800 把 EVENT_SERVICES 写进 dispatch.c，builtin 头文件还没跟上。
+    if grep -q 'EVENT_SERVICES' "${KSU}/kernel/supercall/dispatch.c" && \
+       ! grep -q 'EVENT_SERVICES' "${KSU}/kernel/include/uapi/supercall.h"; then
+      patch -p1 --forward --fuzz=3 -d "${KSU}" \
+        < "${ROOT}/configs/builtin-event-services.patch"
+    fi
     # susfs4ksu d4ea3dd76（09-12）起，50_ 补丁引用 ksu_handle_post_execveat_sucompat。
-    # builtin 在 pre-execve hook 已完成授权，打 no-op stub 满足内核侧引用即可。
-    patch -p1 --forward --fuzz=3 -d "${KSU}" \
-      < "${ROOT}/configs/builtin-post-execveat-stub.patch"
+    # 70fa0e09 起 builtin 已有真实现（ksu_install_su_fd）；更旧的 builtin 才打 no-op stub。
+    if grep -q 'int ksu_handle_post_execveat_sucompat' \
+      "${KSU}/kernel/feature/sucompat.c"; then
+      echo "[+] builtin already has ksu_handle_post_execveat_sucompat; skip stub"
+    else
+      patch -p1 --forward --fuzz=3 -d "${KSU}" \
+        < "${ROOT}/configs/builtin-post-execveat-stub.patch"
+    fi
     ;;
   tag) ;;
   *)
