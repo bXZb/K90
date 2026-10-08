@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared SukiSU tag / artifact prefix. Sourced by 02, 06, 07.
+# Shared SukiSU tag / artifact prefix. Sourced by 02, 05, 06.
 
 ksu_latest_tag() {
   local repo="${1:-${KSU_REPO:-https://github.com/SukiSU-Ultra/SukiSU-Ultra.git}}"
