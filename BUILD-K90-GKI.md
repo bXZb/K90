@@ -88,7 +88,7 @@ bash scripts/06-pack-anykernel.sh
 bash scripts/07-patch-kpm.sh
 ```
 
-顺序不能乱：默认路径下 `02` 只做驱动集成，`03` 才切到 `builtin` 并打开 SUSFS，`04` 才做 RFKILL 清单 / hide_stuff / 去 dirty。只跑 `02`+`03` 就编，**bazel 会在缺 `rfkill.ko` 时失败**，或者编出 WiFi/蓝牙仍坏的包。
+顺序不能乱：默认路径下 `02` 克隆 `builtin` 并做驱动集成，`03` 打开 SUSFS 并补 #974 缺口，`04` 才做 RFKILL 清单 / hide_stuff / 去 dirty。只跑 `02`+`03` 就编，**bazel 会在缺 `rfkill.ko` 时失败**，或者编出 WiFi/蓝牙仍坏的包。
 
 ### 3.3 绝对不要
 
@@ -128,8 +128,8 @@ bash scripts/07-patch-kpm.sh
 |---|---|---|
 | `00-install-deps.sh` | `apt-get` 装 git/repo/编译依赖。要用 **`sudo bash`**，脚本内部自己不 sudo | 不装 bazel（用 `gki/tools/bazel`） |
 | `01-sync-aosp-gki.sh` | `repo init` 分支 `common-android15-6.6`，sync，再把 `common` detach 到 tag `android15-6.6-2025-03_r15` | **会重置 common** |
-| `02-apply-sukisu.sh` | 克隆 SukiSU，合 `configs/sukisu.fragment`。`builtin`：停在默认分支。`tag`：checkout `KSU_TAG`（空则 SukiSU-Ultra 最新 tag） | 没有 SUSFS |
-| `03-apply-susfs.sh` | 打 GKI 侧 `50_add_susfs_in_gki-android15-6.6.patch`。`builtin`：切 `builtin`、补缺失 `arch.h` / `EVENT_SERVICES` 并去掉 `rules.c` 里重复的 `selinux_policy` 声明（SukiSU-Ultra#974）、仅在缺 `ksu_handle_post_execveat_sucompat` 时打 stub、打开 SUSFS Kconfig。`tag`：官方 tag 无 SUSFS 菜单，50_ 的 ifdefs 保持关闭 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
+| `02-apply-sukisu.sh` | 克隆 SukiSU，合 `configs/sukisu.fragment`。`builtin`：克隆 **builtin** 分支。`tag`：checkout `KSU_TAG`（空则 SukiSU-Ultra 最新 tag） | 没有 SUSFS |
+| `03-apply-susfs.sh` | 打 GKI 侧 `50_add_susfs_in_gki-android15-6.6.patch`。`builtin`：对齐 `builtin`、补 #974 缺口（缺 `arch.h` / `EVENT_SERVICES`、去掉 `rules.c` 重复声明）、打开 SUSFS Kconfig。`tag`：官方 tag 无 SUSFS 菜单，50_ 的 ifdefs 保持关闭 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
 | `04-apply-shirkneko-defaults.sh` | **落地** RFKILL=y、删 `rfkill.ko`、关 check_defconfig、TTL/HL、去 protected_exports、去 maybe-dirty、hide_stuff。可重复跑 | 不开 ZRAM/BBG/默认 BBR |
 | `05-build-gki.sh` | 在 `gki/` 里 `tools/bazel run --lto=thin //common:kernel_aarch64_dist`，输出到 `AOSP_DIST`（默认 `out/aosp-release`） | **不再** merge fragment。走 kleaf 自带 clang |
 | `06-pack-anykernel.sh` | WildKernels AK3 + 未压缩 `Image` | 不预打 KPM |

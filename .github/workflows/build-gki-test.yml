@@ -4,7 +4,7 @@
 # 本文件只手动触发，不发 Release，产物进 out/aosp-test。
 # 默认：common-android15-6.6 清单 + tag r21（1cfd9a28721c）。
 # 不要用 common-android15-6.6-2025-03：对应 heads 已迁到 deprecated/，repo sync 会找不到。
-# r21 仍是 6.6.77，hide_stuff 用主线 04，不用 scripts/test/（那是 6.6.139 用的）。
+# r21 仍是 6.6.77，hide_stuff 用主线 04。
 # 不要编 16K、不要刷 system_dlkm。
 
 name: Build K90 GKI (test)

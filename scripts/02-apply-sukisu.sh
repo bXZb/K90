@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# KSU_FLAVOR=builtin (默认, 已验证) 克隆上游默认分支，03 再切 builtin
+# KSU_FLAVOR=builtin (默认, 已验证) 克隆 builtin 分支；03 再 fetch 对齐并打 #974 缺口
 # KSU_FLAVOR=tag     检出官方 tag（默认 = SukiSU-Ultra 仓库最新 tag；KSU_TAG / KSU_COMMIT 可改）
 #
 # 两种 flavor 同构：克隆上游 + 驱动集成（symlink/Makefile/Kconfig）。
@@ -46,7 +46,7 @@ if [ ! -d KernelSU ]; then
       git clone --filter=blob:none "${KSU_REPO}" KernelSU
     fi
   else
-    git clone "${KSU_REPO}" KernelSU
+    git clone --branch builtin "${KSU_REPO}" KernelSU
   fi
 fi
 
@@ -70,7 +70,7 @@ ksu_rev="$(git -C KernelSU rev-parse --short HEAD)"
 if [ "${KSU_FLAVOR}" = "tag" ]; then
   echo "[+] SukiSU integrated (tag @ ${ksu_rev} / ${KSU_COMMIT:-${KSU_TAG}})"
 else
-  echo "[+] SukiSU integrated (builtin prep @ ${ksu_rev}; 03 switches to builtin)"
+  echo "[+] SukiSU integrated (builtin @ ${ksu_rev})"
 fi
 
 FRAGMENT="${ROOT}/configs/sukisu.fragment"
