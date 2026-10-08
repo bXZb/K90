@@ -108,7 +108,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ (github.event.inputs.ksu || 'builtin') == 'tag' && format('SukiSU-{0}-annibale-aosp-6.6.77-4k-SUSFS-REL-', env.KSU_TAG) || 'SukiSU-annibale-aosp-6.6.77-4k-SUSFS-REL-' }}${{ github.run_number }}
+          name: ${{ (github.event.inputs.ksu || 'builtin') == 'tag' && format('SukiSU-{0}-annibale-aosp-6.6.77-4k-REL-', env.KSU_TAG) || 'SukiSU-annibale-aosp-6.6.77-4k-SUSFS-REL-' }}${{ github.run_number }}
           if-no-files-found: error
           retention-days: 30
           path: |
@@ -123,6 +123,8 @@ jobs:
             out/aosp-release/System.map
             out/SukiSU*-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
             out/SukiSU*-annibale-aosp-*-4k-SUSFS-REL-KPM-AnyKernel3.zip
+            out/SukiSU*-annibale-aosp-*-4k-REL-AnyKernel3.zip
+            out/SukiSU*-annibale-aosp-*-4k-REL-KPM-AnyKernel3.zip
 
       - name: Publish GitHub Release
         if: ${{ github.ref_type == 'tag' || inputs.create_release }}
@@ -149,3 +151,5 @@ jobs:
             out/aosp-release/boot-kpm.img
             out/SukiSU*-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
             out/SukiSU*-annibale-aosp-*-4k-SUSFS-REL-KPM-AnyKernel3.zip
+            out/SukiSU*-annibale-aosp-*-4k-REL-AnyKernel3.zip
+            out/SukiSU*-annibale-aosp-*-4k-REL-KPM-AnyKernel3.zip

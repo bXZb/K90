@@ -144,3 +144,5 @@ jobs:
             out/aosp-test/System.map
             out/SukiSU*-annibale-aosp-*-4k-SUSFS-TEST-AnyKernel3.zip
             out/SukiSU*-annibale-aosp-*-4k-SUSFS-TEST-KPM-AnyKernel3.zip
+            out/SukiSU*-annibale-aosp-*-4k-TEST-AnyKernel3.zip
+            out/SukiSU*-annibale-aosp-*-4k-TEST-KPM-AnyKernel3.zip

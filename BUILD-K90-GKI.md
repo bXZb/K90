@@ -194,6 +194,8 @@ out/aosp-release/Image
 out/aosp-release/Image.gz
 out/aosp-release/Image.lz4
 out/SukiSU-annibale-aosp-6.6.77-4k-SUSFS-REL-AnyKernel3.zip
+# tag 变体没有驱动 SUSFS，zip 名是：
+# out/SukiSU-v4.2.0-annibale-aosp-6.6.77-4k-REL-AnyKernel3.zip
 ```
 
 不要和这些旧目录搞混：
