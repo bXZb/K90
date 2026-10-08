@@ -20,11 +20,10 @@ AVBTOOL="${ROOT}/gki/prebuilts/kernel-build-tools/linux-x86/bin/avbtool"
 
 KVER="$(awk '/^VERSION =/{v=$3} /^PATCHLEVEL =/{p=$3} /^SUBLEVEL =/{s=$3} END{print v"."p"."s}' \
   "${ROOT}/gki/common/Makefile")"
-case "${KSU_FLAVOR:-builtin}" in
-  main-susfs) KSU_TAG="SukiSU-Main" ;;
-  *)          KSU_TAG="SukiSU" ;;
-esac
-KPM_ZIP_NAME="${KPM_AK3_ZIP_NAME:-${KSU_TAG}-annibale-aosp-${KVER}-4k-SUSFS-${CHANNEL}-KPM-AnyKernel3.zip}"
+# shellcheck source=lib/ksu_zip_prefix.sh
+. "${ROOT}/scripts/lib/ksu_zip_prefix.sh"
+ZIP_PREFIX="$(ksu_zip_prefix)"
+KPM_ZIP_NAME="${KPM_AK3_ZIP_NAME:-${ZIP_PREFIX}-annibale-aosp-${KVER}-4k-SUSFS-${CHANNEL}-KPM-AnyKernel3.zip}"
 
 rm -rf "${WORK}"
 mkdir -p "${TOOLS}" "${WORK}"

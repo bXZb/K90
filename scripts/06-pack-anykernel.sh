@@ -11,12 +11,10 @@ STAGE="${ROOT}/out/ak3-${VARIANT}"
 KVER="$(awk '/^VERSION =/{v=$3} /^PATCHLEVEL =/{p=$3} /^SUBLEVEL =/{s=$3} END{print v"."p"."s}' \
   "${ROOT}/gki/common/Makefile")"
 VER="${KVER}+SUSFS+RFKILL+${CHANNEL}"
-# main-susfs 变体的产物带 Main- 前缀，避免与 builtin 变体混淆。
-case "${KSU_FLAVOR:-builtin}" in
-  main-susfs) KSU_TAG="SukiSU-Main" ;;
-  *)          KSU_TAG="SukiSU" ;;
-esac
-ZIP_NAME="${AK3_ZIP_NAME:-${KSU_TAG}-annibale-aosp-${KVER}-4k-SUSFS-${CHANNEL}-AnyKernel3.zip}"
+# shellcheck source=lib/ksu_zip_prefix.sh
+. "${ROOT}/scripts/lib/ksu_zip_prefix.sh"
+ZIP_PREFIX="$(ksu_zip_prefix)"
+ZIP_NAME="${AK3_ZIP_NAME:-${ZIP_PREFIX}-annibale-aosp-${KVER}-4k-SUSFS-${CHANNEL}-AnyKernel3.zip}"
 KERNEL_STRING="SukiSU Ultra GKI ${VER} 4k for REDMI K90 (annibale)"
 
 # 官方 v2.2.0：WildKernels/AnyKernel3 @ gki-2.0，默认 zip 只放未压缩 Image。
