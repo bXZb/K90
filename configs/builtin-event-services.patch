@@ -1,0 +1,18 @@
+K90 builtin: declare EVENT_SERVICES
+
+SukiSU-Ultra builtin 70fa0e09 synced dispatch.c from official KernelSU
+(#3800) which switches on EVENT_SERVICES, but kernel/include/uapi/supercall.h
+still only has POST_FS_DATA / BOOT_COMPLETED / MODULE_MOUNTED. GKI
+CONFIG_WERROR fails with undeclared identifier. Same DECLARE() style as
+the rest of the builtin header. Skip once builtin ships EVENT_SERVICES=4.
+
+--- a/kernel/include/uapi/supercall.h
++++ b/kernel/include/uapi/supercall.h
+@@ -27,6 +27,7 @@
+ DECLARE(__u32, EVENT_POST_FS_DATA, 1);
+ DECLARE(__u32, EVENT_BOOT_COMPLETED, 2);
+ DECLARE(__u32, EVENT_MODULE_MOUNTED, 3);
++DECLARE(__u32, EVENT_SERVICES, 4);
+ 
+ DECLARE(__u32, KSU_GET_INFO_FLAG_LKM, (1U << 0));
+ DECLARE(__u32, KSU_GET_INFO_FLAG_MANAGER, (1U << 1));
