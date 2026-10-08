@@ -62,15 +62,15 @@ SukiSU/SUSFS 不必锁死某一个 commit，但分支不能错。换更新 commi
 
 ### 3.1 同一台机器、树已经打过补丁，只重编
 
-不要跑 `01` / `02` / `03`。先跑一遍 `04`（幂等），再编：
+不要跑 `01` / `02`。先跑一遍 `03`（幂等），再编：
 
 ```bash
 cd "$ROOT"
-bash scripts/04-apply-shirkneko-defaults.sh
+bash scripts/03-apply-shirkneko-defaults.sh
 AOSP_DIST="$ROOT/out/aosp-release" BUILD_JOBS=3 LTO=thin \
-  bash scripts/05-build-gki.sh
-bash scripts/06-pack-anykernel.sh
-bash scripts/07-patch-kpm.sh
+  bash scripts/04-build-gki.sh
+bash scripts/05-pack-anykernel.sh
+bash scripts/06-patch-kpm.sh
 ```
 
 ### 3.2 全新系统：clone 本仓库之后从零拉源码
@@ -80,15 +80,14 @@ cd "$ROOT"
 sudo bash scripts/00-install-deps.sh
 bash scripts/01-sync-aosp-gki.sh
 bash scripts/02-apply-sukisu.sh
-bash scripts/03-apply-susfs.sh
-bash scripts/04-apply-shirkneko-defaults.sh
+bash scripts/03-apply-shirkneko-defaults.sh
 AOSP_DIST="$ROOT/out/aosp-release" BUILD_JOBS=3 LTO=thin \
-  bash scripts/05-build-gki.sh
-bash scripts/06-pack-anykernel.sh
-bash scripts/07-patch-kpm.sh
+  bash scripts/04-build-gki.sh
+bash scripts/05-pack-anykernel.sh
+bash scripts/06-patch-kpm.sh
 ```
 
-顺序不能乱：默认路径下 `02` 只做驱动集成，`03` 才切到 `builtin` 并打开 SUSFS，`04` 才做 RFKILL 清单 / hide_stuff / 去 dirty。只跑 `02`+`03` 就编，**bazel 会在缺 `rfkill.ko` 时失败**，或者编出 WiFi/蓝牙仍坏的包。
+顺序不能乱：`02` 克隆 `builtin`、打 SUSFS 并补 #974 缺口，`03` 才做 RFKILL 清单 / hide_stuff / 去 dirty。只跑 `02` 就编，**bazel 会在缺 `rfkill.ko` 时失败**，或者编出 WiFi/蓝牙仍坏的包。
 
 ### 3.3 绝对不要
 
@@ -118,7 +117,7 @@ bash scripts/07-patch-kpm.sh
 | `gki/build/kernel/kleaf/impl/stamp.bzl` | `echo '-g4a507830d890'`，不是 `echo '-maybe-dirty'` |
 | `gki/common/fs/proc/task_mmu.c` | 有 `show_vma_header_prefix_fake` 和 `jit-zygote-cache` |
 
-`04` 会把后几条自动补上。
+`03` 会把后几条自动补上。
 
 ---
 
@@ -128,14 +127,13 @@ bash scripts/07-patch-kpm.sh
 |---|---|---|
 | `00-install-deps.sh` | `apt-get` 装 git/repo/编译依赖。要用 **`sudo bash`**，脚本内部自己不 sudo | 不装 bazel（用 `gki/tools/bazel`） |
 | `01-sync-aosp-gki.sh` | `repo init` 分支 `common-android15-6.6`，sync，再把 `common` detach 到 tag `android15-6.6-2025-03_r15` | **会重置 common** |
-| `02-apply-sukisu.sh` | 克隆 SukiSU，合 `configs/sukisu.fragment`。`builtin`：停在默认分支。`tag`：checkout `KSU_TAG`（空则 SukiSU-Ultra 最新 tag） | 没有 SUSFS |
-| `03-apply-susfs.sh` | 打 GKI 侧 `50_add_susfs_in_gki-android15-6.6.patch`。`builtin`：切 `builtin`、补缺失 `arch.h` / `EVENT_SERVICES` 并去掉 `rules.c` 里重复的 `selinux_policy` 声明（SukiSU-Ultra#974）、仅在缺 `ksu_handle_post_execveat_sucompat` 时打 stub、打开 SUSFS Kconfig。`tag`：官方 tag 无 SUSFS 菜单，50_ 的 ifdefs 保持关闭 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
-| `04-apply-shirkneko-defaults.sh` | **落地** RFKILL=y、删 `rfkill.ko`、关 check_defconfig、TTL/HL、去 protected_exports、去 maybe-dirty、hide_stuff。可重复跑 | 不开 ZRAM/BBG/默认 BBR |
-| `05-build-gki.sh` | 在 `gki/` 里 `tools/bazel run --lto=thin //common:kernel_aarch64_dist`，输出到 `AOSP_DIST`（默认 `out/aosp-release`） | **不再** merge fragment。走 kleaf 自带 clang |
-| `06-pack-anykernel.sh` | WildKernels AK3 + 未压缩 `Image` | 不预打 KPM |
-| `07-patch-kpm.sh` | Linux `kptools` + 管理器同款 `kpimg`（`-s 123`）补 `Image`，产出 `Image-kpm` / `boot-kpm.img` / `*-KPM-AnyKernel3.zip` | 不改未修补的 `Image` 和普通 AK3 zip；不打 `*-lz4` |
+| `02-apply-sukisu.sh` | 克隆 SukiSU，合 `configs/sukisu.fragment`，打 GKI 侧 `50_`。`builtin`：克隆 **builtin**、补 #974 缺口（缺 `arch.h` / `EVENT_SERVICES`、去掉 `rules.c` 重复声明）、打开 SUSFS Kconfig。`tag`：checkout `KSU_TAG`（空则最新 tag）；官方 tag 无 SUSFS 菜单，50_ 的 ifdefs 保持关闭 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
+| `03-apply-shirkneko-defaults.sh` | **落地** RFKILL=y、删 `rfkill.ko`、关 check_defconfig、TTL/HL、去 protected_exports、去 maybe-dirty、hide_stuff。可重复跑 | 不开 ZRAM/BBG/默认 BBR |
+| `04-build-gki.sh` | 在 `gki/` 里 `tools/bazel run --lto=thin //common:kernel_aarch64_dist`，输出到 `AOSP_DIST`（默认 `out/aosp-release`） | **不再** merge fragment。走 kleaf 自带 clang |
+| `05-pack-anykernel.sh` | WildKernels AK3 + 未压缩 `Image` | 不预打 KPM |
+| `06-patch-kpm.sh` | Linux `kptools` + 管理器同款 `kpimg`（`-s 123`）补 `Image`，产出 `Image-kpm` / `boot-kpm.img` / `*-KPM-AnyKernel3.zip` | 不改未修补的 `Image` 和普通 AK3 zip；不打 `*-lz4` |
 
-`05` 成功日志：
+`04` 成功日志：
 
 ```
 # builtin（真机 SUSFS 路径）
@@ -164,12 +162,12 @@ bash scripts/07-patch-kpm.sh
 编进去之后，开机日志里官方 ko 报 `exports duplicate symbol rfkill_alloc (owned by kernel)` 是正常的，不要再去装分区那份。
 
 **SUSFS 必须 `builtin`**  
-官方 tag（`KSU_FLAVOR=tag`）的驱动没有 SUSFS Kconfig。`50_` 的 GKI 代码靠 `CONFIG_KSU_SUSFS` 打开，所以真机 SUSFS 只走 builtin。`02` 之后一定要 `03`。
+官方 tag（`KSU_FLAVOR=tag`）的驱动没有 SUSFS Kconfig。`50_` 的 GKI 代码靠 `CONFIG_KSU_SUSFS` 打开，所以真机 SUSFS 只走 builtin。`02` 会打开 SUSFS Kconfig。
 
 **关掉 check_defconfig**  
-改了 `gki_defconfig` 以后，`gki/common/build.config.gki` 必须是 `POST_DEFCONFIG_CMDS=""`。`04` 会写。
+改了 `gki_defconfig` 以后，`gki/common/build.config.gki` 必须是 `POST_DEFCONFIG_CMDS=""`。`03` 会写。
 
-**ShirkNeko 默认 release 对齐（`04` 做的）**  
+**ShirkNeko 默认 release 对齐（`03` 做的）**  
 hide_stuff、TTL/HL、去掉 `-maybe-dirty`、去掉 `kernel_aarch64` 的 `protected_exports_list`。  
 他们默认 **不开** 的我们也不开：ZRAM LZ4KD、BBG、`CONFIG_DEFAULT_BBR=y`、一加补丁。  
 官方 GKI 里已经有 `CONFIG_TCP_CONG_BBR=y`，默认拥塞算法保持 cubic。  
@@ -253,7 +251,7 @@ getprop debug.device.bluetooth_state  # 1
 
 没有：ZRAM 魔改、BBG、默认 BBR、一加补丁、小米未开源 DTS/驱动。
 
-官方 tag 的 Kconfig 默认 `CONFIG_KSU_MANUAL_SU=y`。`03` 在 `tag` 上会写成 `is not set`，与 builtin 对齐。不要把 `MANUAL_SU=y` 加回 `configs/sukisu.fragment`。
+官方 tag 的 Kconfig 默认 `CONFIG_KSU_MANUAL_SU=y`。`02` 在 `tag` 上会写成 `is not set`，与 builtin 对齐。不要把 `MANUAL_SU=y` 加回 `configs/sukisu.fragment`。
 
 ---
 
@@ -266,7 +264,7 @@ getprop debug.device.bluetooth_state  # 1
 | 路径 | 原因 |
 |---|---|
 | `gki/` | AOSP 整树，几十 GB，`01` 会重新 sync |
-| `third_party/` | `03`/`06` 会重新 clone |
+| `third_party/` | `02`/`05` 会重新 clone |
 | `out/` | 产物，每次构建重新生成 |
 | `logs/` | 本地日志，不是构建输入 |
 
