@@ -26,16 +26,16 @@ on:
         type: string
         default: auto
       ksu:
-        description: "KernelSU 变体（builtin = 已验证默认；main = 官方 tag，默认 v4.2.0）"
+        description: "KernelSU 变体（builtin = 已验证默认；tag = SukiSU-Ultra 官方 tag）"
         type: choice
         default: builtin
         options:
           - builtin
-          - main
+          - tag
       ksu_tag:
-        description: "仅 ksu=main：SukiSU-Ultra 的 git tag 或 commit（空 = v4.2.0）"
+        description: "仅 ksu=tag：指定 SukiSU-Ultra 的 git tag 或 commit。空 = 该仓库最新 tag"
         type: string
-        default: v4.2.0
+        default: ""
       create_release:
         description: "构建成功后发布 GitHub Release"
         type: boolean
@@ -73,7 +73,7 @@ jobs:
       LTO: ${{ github.event.inputs.lto || 'thin' }}
       BUILD_JOBS: ${{ github.event.inputs.jobs || 'auto' }}
       KSU_FLAVOR: ${{ github.event.inputs.ksu || 'builtin' }}
-      KSU_TAG: ${{ github.event.inputs.ksu_tag || 'v4.2.0' }}
+      KSU_TAG: ${{ github.event.inputs.ksu_tag || '' }}
 
     steps:
       - name: Checkout seed
@@ -108,7 +108,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.event.inputs.ksu == 'main' && format('SukiSU-{0}-annibale-aosp-6.6.77-4k-SUSFS-REL-', github.event.inputs.ksu_tag || 'v4.2.0') || 'SukiSU-annibale-aosp-6.6.77-4k-SUSFS-REL-' }}${{ github.run_number }}
+          name: ${{ (github.event.inputs.ksu || 'builtin') == 'tag' && format('SukiSU-{0}-annibale-aosp-6.6.77-4k-SUSFS-REL-', env.KSU_TAG) || 'SukiSU-annibale-aosp-6.6.77-4k-SUSFS-REL-' }}${{ github.run_number }}
           if-no-files-found: error
           retention-days: 30
           path: |
@@ -134,7 +134,7 @@ jobs:
           body: |
             REDMI K90 (`annibale`) AOSP GKI **${{ env.EXPECTED_UNAME }}**
             + 内置 SukiSU/KPM + SUSFS + `RFKILL=y`。
-            ${{ github.event.inputs.ksu == 'main' && format('\n> ⚠️ 变体：SukiSU 官方 tag `{0}`（驱动无 SUSFS 菜单，未经真机验证）\n', github.event.inputs.ksu_tag || 'v4.2.0') || '' }}
+            ${{ (github.event.inputs.ksu || 'builtin') == 'tag' && format('\n> ⚠️ 变体：SukiSU 官方 tag `{0}`（驱动无 SUSFS 菜单，未经真机验证）\n', env.KSU_TAG) || '' }}
 
             优先临时启动（已验证路径）：
 

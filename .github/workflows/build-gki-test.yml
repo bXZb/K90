@@ -47,16 +47,16 @@ on:
         type: string
         default: auto
       ksu:
-        description: "KernelSU 变体（builtin = 已验证默认；main = 官方 tag，默认 v4.2.0）"
+        description: "KernelSU 变体（builtin = 已验证默认；tag = SukiSU-Ultra 官方 tag）"
         type: choice
         default: builtin
         options:
           - builtin
-          - main
+          - tag
       ksu_tag:
-        description: "仅 ksu=main：SukiSU-Ultra 的 git tag 或 commit（空 = v4.2.0）"
+        description: "仅 ksu=tag：指定 SukiSU-Ultra 的 git tag 或 commit。空 = 该仓库最新 tag"
         type: string
-        default: v4.2.0
+        default: ""
 
 concurrency:
   group: k90-gki-test-${{ github.workflow }}-${{ github.ref }}
@@ -77,7 +77,7 @@ jobs:
       AOSP_DIST: ${{ github.workspace }}/out/aosp-test
       AK3_CHANNEL: TEST
       KSU_FLAVOR: ${{ inputs.ksu || 'builtin' }}
-      KSU_TAG: ${{ inputs.ksu_tag || 'v4.2.0' }}
+      KSU_TAG: ${{ inputs.ksu_tag || '' }}
 
     steps:
       - name: Checkout seed
@@ -129,7 +129,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.ksu == 'main' && format('SukiSU-{0}-annibale-aosp-TEST-{1}-', inputs.ksu_tag || 'v4.2.0', inputs.source) || format('SukiSU-annibale-aosp-TEST-{0}-', inputs.source) }}${{ github.run_number }}
+          name: ${{ (inputs.ksu || 'builtin') == 'tag' && format('SukiSU-{0}-annibale-aosp-TEST-{1}-', env.KSU_TAG, inputs.source) || format('SukiSU-annibale-aosp-TEST-{0}-', inputs.source) }}${{ github.run_number }}
           if-no-files-found: error
           retention-days: 14
           path: |
