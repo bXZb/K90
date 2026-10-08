@@ -26,7 +26,7 @@ wanted = [
     "CONFIG_NETFILTER_XT_TARGET_HL=y",
     "CONFIG_NETFILTER_XT_MATCH_HL=y",
 ]
-# 曾尝试写入的 KSU_SUSFS_AUTO_ADD_* 三个键在 builtin 与 10_ 的 Kconfig 里
+# 曾尝试写入的 KSU_SUSFS_AUTO_ADD_* 三个键在 builtin Kconfig 里
 # 都不存在（写了被静默忽略），已删除；勿再加回。
 keys = {}
 for i, line in enumerate(lines):
