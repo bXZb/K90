@@ -36,7 +36,7 @@ ksu_persist_tag() {
 
 ksu_zip_prefix() {
   case "${KSU_FLAVOR:-builtin}" in
-    tag|main|main-susfs)
+    tag)
       local t="${KSU_TAG:-}"
       if [ -z "${t}" ] && [ -n "${ROOT:-}" ] && [ -f "$(ksu_stamp_file)" ]; then
         t="$(tr -d '[:space:]' < "$(ksu_stamp_file)")"
@@ -51,5 +51,21 @@ ksu_zip_prefix() {
     *)
       printf 'SukiSU'
       ;;
+  esac
+}
+
+# Zip token after 4k-. builtin keeps SUSFS-; tag omits it (no driver SUSFS).
+ksu_zip_susfs_mark() {
+  case "${KSU_FLAVOR:-builtin}" in
+    tag) printf '' ;;
+    *) printf 'SUSFS-' ;;
+  esac
+}
+
+# anykernel kernel.string extra features.
+ksu_kernel_ver_extra() {
+  case "${KSU_FLAVOR:-builtin}" in
+    tag) printf 'RFKILL' ;;
+    *) printf 'SUSFS+RFKILL' ;;
   esac
 }

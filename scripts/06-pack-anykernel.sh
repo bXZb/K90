@@ -10,11 +10,11 @@ STAGE="${ROOT}/out/ak3-${VARIANT}"
 
 KVER="$(awk '/^VERSION =/{v=$3} /^PATCHLEVEL =/{p=$3} /^SUBLEVEL =/{s=$3} END{print v"."p"."s}' \
   "${ROOT}/gki/common/Makefile")"
-VER="${KVER}+SUSFS+RFKILL+${CHANNEL}"
 # shellcheck source=lib/ksu_zip_prefix.sh
 . "${ROOT}/scripts/lib/ksu_zip_prefix.sh"
 ZIP_PREFIX="$(ksu_zip_prefix)"
-ZIP_NAME="${AK3_ZIP_NAME:-${ZIP_PREFIX}-annibale-aosp-${KVER}-4k-SUSFS-${CHANNEL}-AnyKernel3.zip}"
+VER="${KVER}+$(ksu_kernel_ver_extra)+${CHANNEL}"
+ZIP_NAME="${AK3_ZIP_NAME:-${ZIP_PREFIX}-annibale-aosp-${KVER}-4k-$(ksu_zip_susfs_mark)${CHANNEL}-AnyKernel3.zip}"
 KERNEL_STRING="SukiSU Ultra GKI ${VER} 4k for REDMI K90 (annibale)"
 
 # 官方 v2.2.0：WildKernels/AnyKernel3 @ gki-2.0，默认 zip 只放未压缩 Image。

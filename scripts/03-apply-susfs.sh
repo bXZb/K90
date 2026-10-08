@@ -3,7 +3,7 @@ set -euo pipefail
 
 # KSU_FLAVOR=builtin (默认) 切 SukiSU builtin 分支，打 stub + 50_，打开 SUSFS Kconfig
 # KSU_FLAVOR=tag     02 已检出官方 tag；只打 GKI 侧 50_（hide_stuff 需要）
-#                    官方 tag 没有 SUSFS 驱动菜单，不再打 10_ / K90 fixup
+#                    官方 tag 没有 SUSFS 驱动菜单，50_ 的 ifdefs 保持关闭
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 COMMON="${ROOT}/gki/common"
@@ -32,9 +32,7 @@ case "${KSU_FLAVOR}" in
     patch -p1 --forward --fuzz=3 -d "${KSU}" \
       < "${ROOT}/configs/builtin-post-execveat-stub.patch"
     ;;
-  tag|main|main-susfs)
-    KSU_FLAVOR=tag
-    ;;
+  tag) ;;
   *)
     echo "unknown KSU_FLAVOR: ${KSU_FLAVOR} (builtin | tag)" >&2
     exit 1
@@ -80,13 +78,15 @@ EOF
 else
   # 官方 tag Kconfig 有 MANUAL_SU 且默认 y；与 builtin 对齐后关掉。
   # 没有 SUSFS 菜单，不要写 CONFIG_KSU_SUSFS*（50_ 的 GKI 代码会因此保持关闭）。
-  sed -i 's/^CONFIG_KSU_MANUAL_SU=y/# CONFIG_KSU_MANUAL_SU is not set/' "${DEFCONFIG}"
   sed -i \
+    -e '/^CONFIG_KSU_MANUAL_SU=/d' \
+    -e '/^# CONFIG_KSU_MANUAL_SU is not set/d' \
     -e '/^CONFIG_KSU_DISABLE_MANAGER=/d' \
     -e '/^CONFIG_KSU_DISABLE_POLICY=/d' \
     "${DEFCONFIG}"
   cat >> "${DEFCONFIG}" <<'EOF'
 
+# CONFIG_KSU_MANUAL_SU is not set
 CONFIG_TMPFS_XATTR=y
 CONFIG_TMPFS_POSIX_ACL=y
 EOF

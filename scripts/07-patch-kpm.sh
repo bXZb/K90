@@ -23,7 +23,7 @@ KVER="$(awk '/^VERSION =/{v=$3} /^PATCHLEVEL =/{p=$3} /^SUBLEVEL =/{s=$3} END{pr
 # shellcheck source=lib/ksu_zip_prefix.sh
 . "${ROOT}/scripts/lib/ksu_zip_prefix.sh"
 ZIP_PREFIX="$(ksu_zip_prefix)"
-KPM_ZIP_NAME="${KPM_AK3_ZIP_NAME:-${ZIP_PREFIX}-annibale-aosp-${KVER}-4k-SUSFS-${CHANNEL}-KPM-AnyKernel3.zip}"
+KPM_ZIP_NAME="${KPM_AK3_ZIP_NAME:-${ZIP_PREFIX}-annibale-aosp-${KVER}-4k-$(ksu_zip_susfs_mark)${CHANNEL}-KPM-AnyKernel3.zip}"
 
 rm -rf "${WORK}"
 mkdir -p "${TOOLS}" "${WORK}"
