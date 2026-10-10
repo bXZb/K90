@@ -65,6 +65,7 @@ else
   git -C KernelSU checkout -B builtin origin/builtin
   # SukiSU-Ultra#974 尚未合入：缺 arch.h、EVENT_SERVICES，rules.c 里重复声明。
   # 上游已有则跳过。post-execveat 已在 70fa0e09 落地，不再打 stub。
+  # 官方管理器不主动 reboot 探测，开机要扫一次已装 APK 才能注入 [ksu_driver]。
   if [ ! -f "${KSU}/kernel/arch.h" ]; then
     cp "${ROOT}/configs/builtin-arch.h" "${KSU}/kernel/arch.h"
   fi
@@ -77,6 +78,11 @@ else
      ! grep -q 'EVENT_SERVICES' "${KSU}/kernel/include/uapi/supercall.h"; then
     patch -p1 --forward --fuzz=3 -d "${KSU}" \
       < "${ROOT}/configs/builtin-event-services.patch"
+  fi
+  # 42d7fda 管理器只认 [ksu_driver]，开机不扫已装 APK 就永远不会注入 fd。
+  if ! grep -q 'track_throne(false);' "${KSU}/kernel/runtime/ksud.c"; then
+    patch -p1 --forward --fuzz=3 -d "${KSU}" \
+      < "${ROOT}/configs/builtin-crown-manager-on-boot.patch"
   fi
 fi
 
