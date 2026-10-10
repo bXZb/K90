@@ -127,7 +127,7 @@ bash scripts/06-patch-kpm.sh
 |---|---|---|
 | `00-install-deps.sh` | `apt-get` 装 git/repo/编译依赖。要用 **`sudo bash`**，脚本内部自己不 sudo | 不装 bazel（用 `gki/tools/bazel`） |
 | `01-sync-aosp-gki.sh` | `repo init` 分支 `common-android15-6.6`，sync，再把 `common` detach 到 tag `android15-6.6-2025-03_r15` | **会重置 common** |
-| `02-apply-sukisu.sh` | 克隆 SukiSU，合 `configs/sukisu.fragment`，打 GKI 侧 `50_`。`builtin`：克隆 **builtin**、补 #974 缺口（缺 `arch.h` / `EVENT_SERVICES`、去掉 `rules.c` 重复声明）、打开 SUSFS Kconfig。`tag`：checkout `KSU_TAG`（空则最新 tag）；官方 tag 无 SUSFS 菜单，50_ 的 ifdefs 保持关闭 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
+| `02-apply-sukisu.sh` | 克隆 SukiSU，合 `configs/sukisu.fragment`，打 GKI 侧 `50_`。`builtin`：克隆 **builtin**、补 #974 缺口（缺 `arch.h` / `EVENT_SERVICES`、去掉 `rules.c` 重复声明）、开机扫描已装管理器、打开 SUSFS Kconfig。`tag`：checkout `KSU_TAG`（空则最新 tag）；官方 tag 无 SUSFS 菜单，50_ 的 ifdefs 保持关闭 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
 | `03-apply-shirkneko-defaults.sh` | **落地** RFKILL=y、删 `rfkill.ko`、关 check_defconfig、TTL/HL、去 protected_exports、去 maybe-dirty、hide_stuff。可重复跑 | 不开 ZRAM/BBG/默认 BBR |
 | `04-build-gki.sh` | 在 `gki/` 里 `tools/bazel run --lto=thin //common:kernel_aarch64_dist`，输出到 `AOSP_DIST`（默认 `out/aosp-release`） | **不再** merge fragment。走 kleaf 自带 clang |
 | `05-pack-anykernel.sh` | WildKernels AK3 + 未压缩 `Image` | 不预打 KPM |
