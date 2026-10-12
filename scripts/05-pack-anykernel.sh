@@ -15,7 +15,7 @@ KVER="$(awk '/^VERSION =/{v=$3} /^PATCHLEVEL =/{p=$3} /^SUBLEVEL =/{s=$3} END{pr
 ZIP_PREFIX="$(ksu_zip_prefix)"
 VER="${KVER}+$(ksu_kernel_ver_extra)+${CHANNEL}"
 ZIP_NAME="${AK3_ZIP_NAME:-${ZIP_PREFIX}-annibale-aosp-${KVER}-4k-$(ksu_zip_susfs_mark)${CHANNEL}-AnyKernel3.zip}"
-KERNEL_STRING="SukiSU Ultra GKI ${VER} 4k for REDMI K90 (annibale)"
+KERNEL_STRING="KernelSU GKI ${VER} 4k for REDMI K90 (annibale)"
 
 # 官方 v2.2.0：WildKernels/AnyKernel3 @ gki-2.0，默认 zip 只放未压缩 Image。
 rm -rf -- "${AK_DIR}"

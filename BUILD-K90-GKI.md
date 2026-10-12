@@ -1,9 +1,9 @@
-# REDMI K90 (annibale) 可用 GKI 编译手册
+# REDMI K90 (annibale) 可用 GKI 编译手册（官方 KernelSU 分支）
 
-下次编译先读这份。按第 3 节命令顺序做，可以编出已在真机验证过的包。不要按旧 `README.md` 的「只加 SukiSU、不加 SUSFS」流程。
+本分支（`kernelsu-official`）构建**官方 KernelSU**（tiann/KernelSU）变体，尚未真机验证；结构沿用主分支（SukiSU Ultra）已验证的手册。通用部分（RFKILL、hide_stuff、验收）与主分支一致。
 
 已验证产物：`out/aosp-release/boot.img`（未压缩 Image）  
-已验证启动：`fastboot boot boot.img`（`boot-lz4.img` / `boot-kpm-lz4.img` 在 annibale 上不能引导）  
+已验证启动：`fastboot boot boot.img`（`boot-lz4.img` 在 annibale 上不能引导）  
 已验证 `uname -r`：`6.6.77-android15-8-4k`  
 真机日志（当时在编译机上）：`/home/admin/log3/`
 
@@ -23,7 +23,7 @@
 | Android | 16（SDK 36） |
 | 页大小 | **4K**。不要编 `kernel_aarch64_16k` |
 
-目标：AOSP GKI **6.6.77**（官方同代）+ 内置 SukiSU Ultra + KPM + SUSFS + `RFKILL=y` + ShirkNeko **默认 release** 对齐项。
+目标：AOSP GKI **6.6.77**（官方同代）+ 内置官方 KernelSU + SUSFS + `RFKILL=y` + ShirkNeko **默认 release** 对齐项。无 KPM（官方 KernelSU 没有 KPM，也不需要 kptools/kpimg）。
 
 不要：网上通用 GKI zip、16K、Xiaomi OSS 当主构建、ZRAM LZ4KD、BBG、默认 BBR、一加补丁、刷我们编的 `system_dlkm*.img`。
 
@@ -37,14 +37,14 @@
 | common tag | `android15-6.6-2025-03_r15` |
 | 该 tag 的 commit | `4a507830d890`（和官方 uname 里的 hash 一致） |
 | 内核版本 | `6.6.77` |
-| SukiSU | 默认：`https://github.com/SukiSU-Ultra/SukiSU-Ultra` 分支 **`builtin`**（验证时 `b1d534bc` / 40856）。实验：`KSU_FLAVOR=tag` 检出官方 tag（默认该仓库**最新 tag**，`KSU_TAG` / CI `ksu_tag` 可指定） |
-| SUSFS | `https://github.com/ShirkNeko/susfs4ksu.git` 分支 **`gki-android15-6.6`**（验证时 v2.2.0）。只在 **builtin** 打开驱动菜单；官方 tag 没有 SUSFS Kconfig |
+| KernelSU | `https://github.com/tiann/KernelSU`，默认检出**最新 tag**（susfs4ksu README 要求用 tag，不要用 main）。`KSU_TAG` / `KSU_COMMIT` / CI `ksu_tag` 可指定 |
+| SUSFS | `https://github.com/ShirkNeko/susfs4ksu.git` 分支 **`gki-android15-6.6`**（无 tag，跟随 HEAD）。`10_` 打进官方驱动打开 SUSFS 菜单（官方 KSU 是 susfs4ksu 的基准目标） |
 | 构建目标 | 在 `gki/` 下：`tools/bazel run --lto=thin //common:kernel_aarch64_dist` |
 | 并行 | 4 核约 15GB 内存用 `BUILD_JOBS=3`，thin LTO 大约 1–2 小时 |
 
 `repo init -b android15-6.6-2025-03` 会失败：那是 tag 不是 branch。`scripts/01-sync-aosp-gki.sh` 已按「先 branch 再 pin tag」写好。
 
-SukiSU/SUSFS 不必锁死某一个 commit，但分支不能错。换更新 commit 后补丁可能对不上，要重新打并验证。
+SukiSU/SUSFS 不必锁死某一个 commit，但分支不能错。换更新 commit 后补丁可能对不上，要重新打并验证。本分支 KernelSU 默认钉 tag（susfs4ksu 以官方 tag 为基准），升级 = 显式换 `KSU_TAG`。
 
 ---
 
@@ -70,7 +70,6 @@ bash scripts/03-apply-shirkneko-defaults.sh
 AOSP_DIST="$ROOT/out/aosp-release" BUILD_JOBS=3 LTO=thin \
   bash scripts/04-build-gki.sh
 bash scripts/05-pack-anykernel.sh
-bash scripts/06-patch-kpm.sh
 ```
 
 ### 3.2 全新系统：clone 本仓库之后从零拉源码
@@ -79,15 +78,14 @@ bash scripts/06-patch-kpm.sh
 cd "$ROOT"
 sudo bash scripts/00-install-deps.sh
 bash scripts/01-sync-aosp-gki.sh
-bash scripts/02-apply-sukisu.sh
+bash scripts/02-apply-kernelsu.sh
 bash scripts/03-apply-shirkneko-defaults.sh
 AOSP_DIST="$ROOT/out/aosp-release" BUILD_JOBS=3 LTO=thin \
   bash scripts/04-build-gki.sh
 bash scripts/05-pack-anykernel.sh
-bash scripts/06-patch-kpm.sh
 ```
 
-顺序不能乱：`02` 克隆 `builtin`、打 SUSFS 并补 #974 缺口，`03` 才做 RFKILL 清单 / hide_stuff / 去 dirty。只跑 `02` 就编，**bazel 会在缺 `rfkill.ko` 时失败**，或者编出 WiFi/蓝牙仍坏的包。
+顺序不能乱：`02` 克隆官方 KernelSU、打 `10_`/`50_` 打开 SUSFS，`03` 才做 RFKILL 清单 / hide_stuff / 去 dirty。只跑 `02` 就编，**bazel 会在缺 `rfkill.ko` 时失败**，或者编出 WiFi/蓝牙仍坏的包。
 
 ### 3.3 绝对不要
 
@@ -108,7 +106,7 @@ bash scripts/06-patch-kpm.sh
 | `git -C gki/common log -1 --oneline` | 以 `4a507830d` 开头（工作区可以是脏的） |
 | `awk '/^VERSION\|^PATCHLEVEL\|^SUBLEVEL/' gki/common/Makefile` | 6 / 6 / 77 |
 | `gki/common/drivers/kernelsu` | 存在 |
-| `git -C gki/common/KernelSU branch --show-current` | `builtin`（`KSU_FLAVOR=tag` 时是 detached 官方 tag） |
+| `gki/common/KernelSU` 检出状态 | detached（官方 tag 或 `KSU_COMMIT`），`git -C gki/common/KernelSU describe --tags` 应报 `v3.x.x` |
 | `gki/common/include/linux/susfs.h` | 存在 |
 | `grep ^CONFIG_RFKILL= gki/common/arch/arm64/configs/gki_defconfig` | `CONFIG_RFKILL=y` |
 | `grep rfkill.ko gki/common/modules.bzl` | **没有**输出 |
@@ -127,23 +125,18 @@ bash scripts/06-patch-kpm.sh
 |---|---|---|
 | `00-install-deps.sh` | `apt-get` 装 git/repo/编译依赖。要用 **`sudo bash`**，脚本内部自己不 sudo | 不装 bazel（用 `gki/tools/bazel`） |
 | `01-sync-aosp-gki.sh` | `repo init` 分支 `common-android15-6.6`，sync，再把 `common` detach 到 tag `android15-6.6-2025-03_r15` | **会重置 common** |
-| `02-apply-sukisu.sh` | 克隆 SukiSU，合 `configs/sukisu.fragment`，打 GKI 侧 `50_`。`builtin`：克隆 **builtin**、补 #974 缺口（缺 `arch.h` / `EVENT_SERVICES`、去掉 `rules.c` 重复声明）、打开 SUSFS Kconfig。`tag`：checkout `KSU_TAG`（空则最新 tag）；官方 tag 无 SUSFS 菜单，50_ 的 ifdefs 保持关闭 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
+| `02-apply-kernelsu.sh` | 克隆官方 KernelSU（默认最新 tag），`10_` 打进驱动（打开 SUSFS 菜单），合 `configs/kernelsu.fragment`，symlink/Makefile/Kconfig 挂接，打 GKI 侧 `50_` 并写 SUSFS defconfig 块 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
 | `03-apply-shirkneko-defaults.sh` | **落地** RFKILL=y、删 `rfkill.ko`、关 check_defconfig、TTL/HL、去 protected_exports、去 maybe-dirty、hide_stuff。可重复跑 | 不开 ZRAM/BBG/默认 BBR |
 | `04-build-gki.sh` | 在 `gki/` 里 `tools/bazel run --lto=thin //common:kernel_aarch64_dist`，输出到 `AOSP_DIST`（默认 `out/aosp-release`） | **不再** merge fragment。走 kleaf 自带 clang |
-| `05-pack-anykernel.sh` | WildKernels AK3 + 未压缩 `Image` | 不预打 KPM |
-| `06-patch-kpm.sh` | Linux `kptools` + 管理器同款 `kpimg`（`-s 123`）补 `Image`，产出 `Image-kpm` / `boot-kpm.img` / `*-KPM-AnyKernel3.zip` | 不改未修补的 `Image` 和普通 AK3 zip；不打 `*-lz4` |
+| `05-pack-anykernel.sh` | WildKernels AK3 + 未压缩 `Image` | 不打 KPM（本分支无 KPM） |
 
 `04` 成功日志：
 
 ```
-# builtin（真机 SUSFS 路径）
--- SukiSU-Ultra: using SUSFS_INLINE_HOOK
--- KPM is enabled
--- SUSFS_VERSION: v2.3.0
-
-# tag（官方 tag 驱动没有 SUSFS 菜单，不会打出上面两行）
--- SukiSU-Ultra version: 40959 [v4.2.0-…]
--- KPM is enabled
+-- KernelSU: Git repo detected at ...
+-- KernelSU version: 3xxxx
+-- KernelSU Manager package name: me.weishu.kernelsu
+-- SUSFS_VERSION: v2.3.0（10_/50_ 之后驱动侧输出）
 ```
 
 产物目录里 **不应** 有 `rfkill.ko`。`System.map` 里应有 `rfkill_alloc`。
@@ -161,8 +154,8 @@ bash scripts/06-patch-kpm.sh
 
 编进去之后，开机日志里官方 ko 报 `exports duplicate symbol rfkill_alloc (owned by kernel)` 是正常的，不要再去装分区那份。
 
-**SUSFS 必须 `builtin`**  
-官方 tag（`KSU_FLAVOR=tag`）的驱动没有 SUSFS Kconfig。`50_` 的 GKI 代码靠 `CONFIG_KSU_SUSFS` 打开，所以真机 SUSFS 只走 builtin。`02` 会打开 SUSFS Kconfig。
+**SUSFS 靠 `10_` 打开**  
+susfs4ksu 的 README 明确以官方 KernelSU（weishu 版）tag 为基准：`10_enable_susfs_for_ksu.patch` 打进驱动后，官方 Kconfig 才有 `CONFIG_KSU_SUSFS*` 菜单；`50_` 的 GKI 代码靠 `CONFIG_KSU_SUSFS` 打开。`02` 会打 `10_` 并写 SUSFS 块。注意：**不要用官方 main 分支**（LKM 形态优先），用 tag。
 
 **关掉 check_defconfig**  
 改了 `gki_defconfig` 以后，`gki/common/build.config.gki` 必须是 `POST_DEFCONFIG_CMDS=""`。`03` 会写。
@@ -185,15 +178,12 @@ hide_stuff、TTL/HL、去掉 `-maybe-dirty`、去掉 `kernel_aarch64` 的 `prote
 
 ```
 out/aosp-release/boot.img              ← 真机验证用这个（未压缩）
-out/aosp-release/boot-kpm.img          ← 已打 KPM，同样 fastboot boot
 out/aosp-release/boot-lz4.img          ← AOSP 也打，annibale 上不能引导
 out/aosp-release/boot-gz.img
 out/aosp-release/Image
 out/aosp-release/Image.gz
 out/aosp-release/Image.lz4
-out/SukiSU-annibale-aosp-6.6.77-4k-SUSFS-REL-AnyKernel3.zip
-# tag 变体没有驱动 SUSFS，zip 名是：
-# out/SukiSU-v4.2.0-annibale-aosp-6.6.77-4k-REL-AnyKernel3.zip
+out/KernelSU-v3.3.1-annibale-aosp-6.6.77-4k-SUSFS-REL-AnyKernel3.zip
 ```
 
 不要和这些旧目录搞混：
@@ -227,7 +217,7 @@ getprop wifi.active.interface         # wlan0
 getprop debug.device.bluetooth_state  # 1
 ```
 
-用户侧：WiFi 能开能连，蓝牙能开，震动不是高频乱震，SukiSU 显示工作中。
+用户侧：WiFi 能开能连，蓝牙能开，震动不是高频乱震，KernelSU（官方管理器 me.weishu.kernelsu）显示工作中。
 
 长期再用 AnyKernel3 或 `fastboot flash boot`。先备份官方 `boot.img`。zip 还没在这台机上刷过，优先继续用未压缩 `boot.img` 验证。
 
@@ -247,11 +237,11 @@ getprop debug.device.bluetooth_state  # 1
 
 ## 10. 当前包里有什么
 
-有：6.6.77 4K 同代 GKI、内置 SukiSU+KPM+ADB Root、SUSFS（`SUS_PATH=n`、`SUS_SU=n`）、`RFKILL` 内置、hide_stuff、TTL/HL、BBR 编进内核但默认 cubic、uname 无 dirty、去掉 protected exports。
+有：6.6.77 4K 同代 GKI、内置官方 KernelSU、SUSFS（`SUS_PATH=n`，无 `SUS_SU` 此键）、`RFKILL` 内置、hide_stuff、TTL/HL、BBR 编进内核但默认 cubic、uname 无 dirty、去掉 protected exports。
 
-没有：ZRAM 魔改、BBG、默认 BBR、一加补丁、小米未开源 DTS/驱动。
+没有：KPM（官方 KernelSU 无此功能）、ZRAM 魔改、BBG、默认 BBR、一加补丁、小米未开源 DTS/驱动。
 
-官方 tag 的 Kconfig 默认 `CONFIG_KSU_MANUAL_SU=y`。`02` 在 `tag` 上会写成 `is not set`，与 builtin 对齐。不要把 `MANUAL_SU=y` 加回 `configs/sukisu.fragment`。
+官方 Kconfig 没有 `KSU_MANUAL_SU`（那是 SukiSU 特有）；有 `KSU_DISABLE_MANAGER`/`KSU_DISABLE_POLICY` 但默认 n，不写。官方管理器包名 `me.weishu.kernelsu`。
 
 ---
 

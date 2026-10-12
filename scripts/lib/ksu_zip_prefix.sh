@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Shared SukiSU tag / artifact prefix. Sourced by 02, 05, 06.
+# Shared KernelSU tag / artifact prefix. Sourced by 02, 05.
+# 本分支只构建官方 KernelSU（tiann/KernelSU）单一形态。
 
 ksu_latest_tag() {
-  local repo="${1:-${KSU_REPO:-https://github.com/SukiSU-Ultra/SukiSU-Ultra.git}}"
+  local repo="${1:-${KSU_REPO:-https://github.com/tiann/KernelSU.git}}"
   local tag
   tag="$(
     git ls-remote --tags --sort=-version:refname "${repo}" \
@@ -13,7 +14,7 @@ ksu_latest_tag() {
       | head -n1
   )"
   if [ -z "${tag}" ]; then
-    echo "could not resolve latest SukiSU tag from ${repo}" >&2
+    echo "could not resolve latest KernelSU tag from ${repo}" >&2
     return 1
   fi
   printf '%s' "${tag}"
@@ -29,43 +30,29 @@ ksu_persist_tag() {
   if [ -n "${GITHUB_ENV:-}" ]; then
     {
       echo "KSU_TAG=${KSU_TAG}"
-      echo "KSU_FLAVOR=${KSU_FLAVOR}"
     } >> "${GITHUB_ENV}"
   fi
 }
 
 ksu_zip_prefix() {
-  case "${KSU_FLAVOR:-builtin}" in
-    tag)
-      local t="${KSU_TAG:-}"
-      if [ -z "${t}" ] && [ -n "${ROOT:-}" ] && [ -f "$(ksu_stamp_file)" ]; then
-        t="$(tr -d '[:space:]' < "$(ksu_stamp_file)")"
-      fi
-      if [ -z "${t}" ] && [ -n "${ROOT:-}" ] && [ -d "${ROOT}/gki/common/KernelSU/.git" ]; then
-        t="$(git -C "${ROOT}/gki/common/KernelSU" describe --tags --exact-match HEAD 2>/dev/null || true)"
-      fi
-      t="${t:-tag}"
-      t="${t//\//-}"
-      printf 'SukiSU-%s' "${t}"
-      ;;
-    *)
-      printf 'SukiSU'
-      ;;
-  esac
+  local t="${KSU_TAG:-}"
+  if [ -z "${t}" ] && [ -n "${ROOT:-}" ] && [ -f "$(ksu_stamp_file)" ]; then
+    t="$(tr -d '[:space:]' < "$(ksu_stamp_file)")"
+  fi
+  if [ -z "${t}" ] && [ -n "${ROOT:-}" ] && [ -d "${ROOT}/gki/common/KernelSU/.git" ]; then
+    t="$(git -C "${ROOT}/gki/common/KernelSU" describe --tags --exact-match HEAD 2>/dev/null || true)"
+  fi
+  t="${t:-tag}"
+  t="${t//\//-}"
+  printf 'KernelSU-%s' "${t}"
 }
 
-# Zip token after 4k-. builtin keeps SUSFS-; tag omits it (no driver SUSFS).
+# Zip token after 4k-. 官方 KernelSU + 10_ 有 SUSFS 菜单且已启用。
 ksu_zip_susfs_mark() {
-  case "${KSU_FLAVOR:-builtin}" in
-    tag) printf '' ;;
-    *) printf 'SUSFS-' ;;
-  esac
+  printf 'SUSFS-'
 }
 
 # anykernel kernel.string extra features.
 ksu_kernel_ver_extra() {
-  case "${KSU_FLAVOR:-builtin}" in
-    tag) printf 'RFKILL' ;;
-    *) printf 'SUSFS+RFKILL' ;;
-  esac
+  printf 'SUSFS+RFKILL'
 }

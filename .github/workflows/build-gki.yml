@@ -1,6 +1,6 @@
-# REDMI K90 (annibale) — AOSP GKI 6.6.77 + SukiSU + SUSFS
+# REDMI K90 (annibale) — AOSP GKI 6.6.77 + 官方 KernelSU + SUSFS
 #
-# 顺序与 BUILD-K90-GKI.md 第 3.2 节一致：00→01→02→03→04→05→06。不要编 16K。
+# 顺序与 BUILD-K90-GKI.md 第 3.2 节一致：00→01→02→03→04→05。不要编 16K。
 # 标准 GitHub-hosted runner（约 4 核 / 16GB）用 BUILD_JOBS=3、LTO=thin，和手册一致。
 # 磁盘：endersonmenezes/free-disk-space@v3（已验证清完约 55G）。
 # 不要用 maximize-build-space：这台镜像没有独立 /mnt，LVM 会把根分区吃光。
@@ -25,15 +25,8 @@ on:
         description: "bazel --jobs（auto = 按 CPU/内存估算）"
         type: string
         default: auto
-      ksu:
-        description: "KernelSU 变体（builtin = 已验证默认；tag = SukiSU-Ultra 官方 tag）"
-        type: choice
-        default: builtin
-        options:
-          - builtin
-          - tag
       ksu_tag:
-        description: "仅 ksu=tag：指定 SukiSU-Ultra 的 git tag 或 commit。空 = 该仓库最新 tag"
+        description: "指定 tiann/KernelSU 的 git tag 或 commit。空 = 官方仓库最新 tag"
         type: string
         default: ""
       create_release:
@@ -72,7 +65,6 @@ jobs:
     env:
       LTO: ${{ github.event.inputs.lto || 'thin' }}
       BUILD_JOBS: ${{ github.event.inputs.jobs || 'auto' }}
-      KSU_FLAVOR: ${{ github.event.inputs.ksu || 'builtin' }}
       KSU_TAG: ${{ github.event.inputs.ksu_tag || '' }}
 
     steps:
@@ -87,8 +79,8 @@ jobs:
       - name: Sync AOSP GKI (01)
         run: bash scripts/01-sync-aosp-gki.sh
 
-      - name: Apply SukiSU + SUSFS (02)
-        run: bash scripts/02-apply-sukisu.sh
+      - name: Apply KernelSU + SUSFS (02)
+        run: bash scripts/02-apply-kernelsu.sh
 
       - name: Apply ShirkNeko defaults (03)
         run: bash scripts/03-apply-shirkneko-defaults.sh
@@ -99,13 +91,10 @@ jobs:
       - name: Pack AnyKernel3 (05)
         run: bash scripts/05-pack-anykernel.sh
 
-      - name: Patch KPM Image (06)
-        run: bash scripts/06-patch-kpm.sh
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ (github.event.inputs.ksu || 'builtin') == 'tag' && format('SukiSU-{0}-annibale-aosp-6.6.77-4k-REL-', env.KSU_TAG) || 'SukiSU-annibale-aosp-6.6.77-4k-SUSFS-REL-' }}${{ github.run_number }}
+          name: KernelSU-${{ env.KSU_TAG }}-annibale-aosp-6.6.77-4k-SUSFS-REL-${{ github.run_number }}
           if-no-files-found: error
           retention-days: 30
           path: |
@@ -115,13 +104,8 @@ jobs:
             out/aosp-release/Image
             out/aosp-release/Image.gz
             out/aosp-release/Image.lz4
-            out/aosp-release/Image-kpm
-            out/aosp-release/boot-kpm.img
             out/aosp-release/System.map
-            out/SukiSU*-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
-            out/SukiSU*-annibale-aosp-*-4k-SUSFS-REL-KPM-AnyKernel3.zip
-            out/SukiSU*-annibale-aosp-*-4k-REL-AnyKernel3.zip
-            out/SukiSU*-annibale-aosp-*-4k-REL-KPM-AnyKernel3.zip
+            out/KernelSU*-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
 
       - name: Publish GitHub Release
         if: ${{ github.ref_type == 'tag' || inputs.create_release }}
@@ -132,21 +116,15 @@ jobs:
           generate_release_notes: true
           body: |
             REDMI K90 (`annibale`) AOSP GKI **${{ env.EXPECTED_UNAME }}**
-            + 内置 SukiSU/KPM + SUSFS + `RFKILL=y`。
-            ${{ (github.event.inputs.ksu || 'builtin') == 'tag' && format('\n> ⚠️ 变体：SukiSU 官方 tag `{0}`（驱动无 SUSFS 菜单，未经真机验证）\n', env.KSU_TAG) || '' }}
+            + 内置官方 KernelSU（tiann `${{ env.KSU_TAG }}`）+ SUSFS + `RFKILL=y`。
 
             优先临时启动（已验证路径）：
 
             ```
             fastboot boot boot.img
-            fastboot boot boot-kpm.img
             ```
 
             不要刷 `system_dlkm*.img`。不要用 16K / 网上通用 GKI。不要 `fastboot boot` `*-lz4.img`。
           files: |
             out/aosp-release/boot.img
-            out/aosp-release/boot-kpm.img
-            out/SukiSU*-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
-            out/SukiSU*-annibale-aosp-*-4k-SUSFS-REL-KPM-AnyKernel3.zip
-            out/SukiSU*-annibale-aosp-*-4k-REL-AnyKernel3.zip
-            out/SukiSU*-annibale-aosp-*-4k-REL-KPM-AnyKernel3.zip
+            out/KernelSU*-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
