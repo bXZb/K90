@@ -57,6 +57,14 @@ git clone --depth=1 --branch "${SUSFS_BRANCH}" \
 cd "${KSU}"
 patch -p1 --no-backup-if-mismatch \
   < "${SUSFS_DIR}/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+
+# 10_ 已知 bug（ShirkNeko/susfs4ksu#10 被关未合）：把 selinux_hide.c 里两个
+# 运行时解析的函数指针改成 extern 函数，但使用点仍是裸 if (fn) 真值判断，
+# GKI 树内 CONFIG_WERROR 下 -Wpointer-bool-conversion 必炸。显式与 NULL 比较。
+sed -i \
+  -e 's/if (security_dump_masked_av_fn)/if ((void *)security_dump_masked_av_fn != NULL)/' \
+  -e 's/if (context_struct_compute_av_fn)/if ((void *)context_struct_compute_av_fn != NULL)/' \
+  kernel/feature/selinux_hide.c
 cd "${KERNEL_ROOT}"
 
 # 驱动挂进 GKI 树（与官方 setup.sh 同构：相对 symlink + Makefile 追加 + Kconfig endmenu 前）。
