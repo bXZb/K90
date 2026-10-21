@@ -12,10 +12,12 @@ STAGE="${ROOT}/out/ak3-${VARIANT}"
 WORK="${ROOT}/out/kpm-work"
 TOOLS="${ROOT}/out/kpm-tools"
 KPM_KEY="${KPM_KEY:-123}"
-KPTOOLS_URL="${KPTOOLS_URL:-https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/download/0.13.0/kptools-linux}"
+# 全跟随上游（2026-10-21 起，与 builtin/susfs 的裸跟随策略一致）：
+# kptools 跟最新 release（releases/latest 永久重定向），kpimg 跟 SukiSU_patch main HEAD。
+# 上游回归时会直接反映到构建；要复现旧版用 KPTOOLS_URL / KPIMG_URL 环境变量覆盖。
+KPTOOLS_URL="${KPTOOLS_URL:-https://github.com/SukiSU-Ultra/SukiSU_KernelPatch_patch/releases/latest/download/kptools-linux}"
 # 仓库已从 ShirkNeko/SukiSU_patch 转移到 SukiSU-Ultra/SukiSU_patch。
-# kpimg pin 到固定 commit（547ae94b，2026-03-15 "更新kpm版本"）；升级 = 显式换 SHA。
-KPIMG_URL="${KPIMG_URL:-https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/547ae94bcaec53d030398f857950c64662043a5d/kpm/kpimg}"
+KPIMG_URL="${KPIMG_URL:-https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/main/kpm/kpimg}"
 AVBTOOL="${ROOT}/gki/prebuilts/kernel-build-tools/linux-x86/bin/avbtool"
 
 KVER="$(awk '/^VERSION =/{v=$3} /^PATCHLEVEL =/{p=$3} /^SUBLEVEL =/{s=$3} END{print v"."p"."s}' \
