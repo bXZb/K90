@@ -26,7 +26,11 @@ on:
         type: string
         default: auto
       ksu_tag:
-        description: "指定 tiann/KernelSU 的 git tag 或 commit。空 = 官方仓库最新 tag"
+        description: "手动指定 tiann/KernelSU 的 tag 或 commit。空 = 联动解析（checkout 到 susfs 最新 sync 点）"
+        type: string
+        default: ""
+      susfs_commit:
+        description: "手动 pin ShirkNeko/susfs4ksu 的 commit。空 = 跟随 gki-android15-6.6 HEAD"
         type: string
         default: ""
       create_release:
@@ -66,6 +70,7 @@ jobs:
       LTO: ${{ github.event.inputs.lto || 'thin' }}
       BUILD_JOBS: ${{ github.event.inputs.jobs || 'auto' }}
       KSU_TAG: ${{ github.event.inputs.ksu_tag || '' }}
+      SUSFS_COMMIT: ${{ github.event.inputs.susfs_commit || '' }}
 
     steps:
       - name: Checkout seed

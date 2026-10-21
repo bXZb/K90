@@ -37,14 +37,14 @@
 | common tag | `android15-6.6-2025-03_r15` |
 | 该 tag 的 commit | `4a507830d890`（和官方 uname 里的 hash 一致） |
 | 内核版本 | `6.6.77` |
-| KernelSU | `https://github.com/tiann/KernelSU`，默认检出**最新 tag**（susfs4ksu README 要求用 tag，不要用 main）。`KSU_TAG` / `KSU_COMMIT` / CI `ksu_tag` 可指定 |
-| SUSFS | `https://github.com/ShirkNeko/susfs4ksu.git` 分支 **`gki-android15-6.6`**（无 tag，跟随 HEAD）。`10_` 打进官方驱动打开 SUSFS 菜单（官方 KSU 是 susfs4ksu 的基准目标） |
+| KernelSU | `https://github.com/tiann/KernelSU`。默认**联动解析**：checkout 到 susfs 最新 sync 提交消息里的 tiann commit（10_ 与驱动按构造对齐）。`KSU_TAG` / `KSU_COMMIT` / CI `ksu_tag` 可手动指定 |
+| SUSFS | `https://github.com/ShirkNeko/susfs4ksu.git` 分支 **`gki-android15-6.6`**，默认跟随 HEAD；`susfs_commit` / CI 输入可 pin。`10_` 打进官方驱动打开 SUSFS 菜单 |
 | 构建目标 | 在 `gki/` 下：`tools/bazel run --lto=thin //common:kernel_aarch64_dist` |
 | 并行 | 4 核约 15GB 内存用 `BUILD_JOBS=3`，thin LTO 大约 1–2 小时 |
 
 `repo init -b android15-6.6-2025-03` 会失败：那是 tag 不是 branch。`scripts/01-sync-aosp-gki.sh` 已按「先 branch 再 pin tag」写好。
 
-SukiSU/SUSFS 不必锁死某一个 commit，但分支不能错。换更新 commit 后补丁可能对不上，要重新打并验证。本分支 KernelSU 默认钉 tag（susfs4ksu 以官方 tag 为基准），升级 = 显式换 `KSU_TAG`。
+上游两侧都在动。默认联动解析自动对齐（susfs HEAD + 其 sync 点的 KSU），无需手动跟；手动 pin 任一侧时**要自己保证两侧配套**（susfs sync 点变了，旧 KSU pin 就可能对不上，run #45 的教训）。构建日志会打印两侧解析结果（`susfs4ksu HEAD @ xxx` / `KSU ref: linked sync point xxx`）。
 
 ---
 
@@ -125,7 +125,7 @@ bash scripts/05-pack-anykernel.sh
 |---|---|---|
 | `00-install-deps.sh` | `apt-get` 装 git/repo/编译依赖。要用 **`sudo bash`**，脚本内部自己不 sudo | 不装 bazel（用 `gki/tools/bazel`） |
 | `01-sync-aosp-gki.sh` | `repo init` 分支 `common-android15-6.6`，sync，再把 `common` detach 到 tag `android15-6.6-2025-03_r15` | **会重置 common** |
-| `02-apply-kernelsu.sh` | 克隆官方 KernelSU（默认最新 tag），`10_` 打进驱动（打开 SUSFS 菜单），合 `configs/kernelsu.fragment`，symlink/Makefile/Kconfig 挂接，打 GKI 侧 `50_` 并写 SUSFS defconfig 块 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
+| `02-apply-kernelsu.sh` | 克隆 susfs（默认 HEAD，`susfs_commit` 可 pin），解析其最新 sync 点并 checkout 官方 KernelSU（`ksu_tag` 可覆盖），`10_` 打进驱动 + selinux_hide -Werror fixup，挂接 GKI 树，合 `configs/kernelsu.fragment`，打 `50_` 并写 SUSFS defconfig 块 | 不含 hide_stuff、TTL、modules.bzl、stamp、protected_exports |
 | `03-apply-shirkneko-defaults.sh` | **落地** RFKILL=y、删 `rfkill.ko`、关 check_defconfig、TTL/HL、去 protected_exports、去 maybe-dirty、hide_stuff。可重复跑 | 不开 ZRAM/BBG/默认 BBR |
 | `04-build-gki.sh` | 在 `gki/` 里 `tools/bazel run --lto=thin //common:kernel_aarch64_dist`，输出到 `AOSP_DIST`（默认 `out/aosp-release`） | **不再** merge fragment。走 kleaf 自带 clang |
 | `05-pack-anykernel.sh` | WildKernels AK3 + 未压缩 `Image` | 不打 KPM（本分支无 KPM） |
@@ -155,7 +155,7 @@ bash scripts/05-pack-anykernel.sh
 编进去之后，开机日志里官方 ko 报 `exports duplicate symbol rfkill_alloc (owned by kernel)` 是正常的，不要再去装分区那份。
 
 **SUSFS 靠 `10_` 打开**  
-susfs4ksu 的 README 明确以官方 KernelSU（weishu 版）tag 为基准：`10_enable_susfs_for_ksu.patch` 打进驱动后，官方 Kconfig 才有 `CONFIG_KSU_SUSFS*` 菜单；`50_` 的 GKI 代码靠 `CONFIG_KSU_SUSFS` 打开。`02` 会打 `10_` 并写 SUSFS 块。注意：**不要用官方 main 分支**（LKM 形态优先），用 tag。
+susfs4ksu 以官方 KernelSU 为基准维护：`10_enable_susfs_for_ksu.patch` 打进驱动后，官方 Kconfig 才有 `CONFIG_KSU_SUSFS*` 菜单；`50_` 的 GKI 代码靠 `CONFIG_KSU_SUSFS` 打开。联动解析保证 10_ 与驱动同代（susfs 的 sync 提交消息自带 tiann commit）。注意：50_ 现按官方 KSU 的符号接线，**别把它配 SukiSU 驱动**（`my_setprocattr` 等符号只在官方 v3.x 有，main/SukiSU 线 2026-10-21 踩过）。
 
 **关掉 check_defconfig**  
 改了 `gki_defconfig` 以后，`gki/common/build.config.gki` 必须是 `POST_DEFCONFIG_CMDS=""`。`03` 会写。

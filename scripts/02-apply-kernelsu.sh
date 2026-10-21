@@ -2,10 +2,14 @@
 set -euo pipefail
 
 # 官方 KernelSU（tiann/KernelSU）in-tree 集成 + SUSFS。
-# 这是 susfs4ksu README 明示的标准组合：官方 KSU tag + 10_（驱动侧）+ 50_（内核侧）。
-#   KSU_TAG / KSU_COMMIT：指定 tag 或 commit；空 = 官方仓库最新 tag。
-# 流程：clone 官方 KernelSU → 10_ 补丁打进驱动 → symlink/Makefile/Kconfig 挂接
-#      → defconfig fragment → susfs fs/include + 50_ 补丁 → 打开 SUSFS 菜单。
+# susfs4ksu 每次 "Sync with the official KernelSU main repo" 提交的消息里都写明
+# 对应的 tiann commit。默认策略（联动解析）：susfs 跟 HEAD，KSU checkout 到其
+# 最新 sync 点 —— 10_ 与驱动按构造对齐（susfs 作者就是拿那个点验证补丁的）。
+# 手动覆盖：KSU_TAG / KSU_COMMIT 指定驱动侧，SUSFS_COMMIT pin susfs 侧；
+# 任一驱动侧输入生效即跳过联动解析。
+# 流程：clone susfs（并解析）→ clone KernelSU 到解析点 → 10_ 补丁打进驱动
+#      → symlink/Makefile/Kconfig 挂接 → defconfig fragment
+#      → susfs fs/include + 50_ 补丁 → 打开 SUSFS 菜单。
 # 官方 v3.x kernel/ 目录同时带 Kbuild（in-tree）与 Makefile（LKM 独立构建），
 # in-tree 走 Kbuild，集成方式与官方 setup.sh 同构。
 
@@ -22,14 +26,36 @@ SUSFS_DIR="${ROOT}/third_party/susfs4ksu"
 SUSFS_BRANCH="gki-android15-6.6"
 GKI_DEFCONFIG="${KERNEL_ROOT}/arch/arm64/configs/gki_defconfig"
 
+# --- susfs 先行：联动解析要从它的提交史里取 tiann 同步点 ---
+# depth=30 覆盖 sync 间隔；手动 pin 旧 commit 时按同一深度取其祖先史。
+SUSFS_COMMIT="${SUSFS_COMMIT:-}"
+git clone --depth=30 --branch "${SUSFS_BRANCH}" \
+  https://github.com/ShirkNeko/susfs4ksu.git "${SUSFS_DIR}"
+if [ -n "${SUSFS_COMMIT}" ]; then
+  git -C "${SUSFS_DIR}" fetch --depth=30 origin "${SUSFS_COMMIT}"
+  git -C "${SUSFS_DIR}" checkout -q --detach FETCH_HEAD
+  echo "[+] susfs4ksu manual pin @ $(git -C "${SUSFS_DIR}" rev-parse --short HEAD)"
+else
+  echo "[+] susfs4ksu HEAD @ $(git -C "${SUSFS_DIR}" rev-parse --short HEAD)"
+fi
+
+# --- 解析 KSU ref：手动输入优先，否则联动解析 susfs 最新 sync 点 ---
 if [ -n "${KSU_COMMIT}" ]; then
   ref="${KSU_COMMIT}"
+  echo "[+] KSU ref: manual commit ${ref}"
 elif [ -n "${KSU_TAG}" ]; then
   ref="${KSU_TAG}"
+  echo "[+] KSU ref: manual tag ${ref}"
 else
-  KSU_TAG="$(ksu_latest_tag "${KSU_REPO}")"
-  ref="${KSU_TAG}"
-  echo "[+] KSU_TAG empty; using latest ${KSU_TAG}"
+  ref="$(git -C "${SUSFS_DIR}" log -30 --format=%B \
+    | grep -oE 'tiann/KernelSU/commit/[0-9a-f]{40}' \
+    | head -n1 | cut -d/ -f4)"
+  if [ -z "${ref}" ]; then
+    echo "ERROR: susfs 最近 30 条提交里没有 tiann/KernelSU/commit/<sha> 同步点，" \
+         "上游消息格式可能变了。用 ksu_tag / KSU_COMMIT / susfs_commit 手动指定。" >&2
+    exit 1
+  fi
+  echo "[+] KSU ref: linked sync point ${ref} (parsed from susfs log)"
 fi
 
 cd "${KERNEL_ROOT}"
@@ -41,24 +67,14 @@ if [ ! -d KernelSU ]; then
 fi
 git -C KernelSU fetch --depth=1 origin "${ref}"
 git -C KernelSU checkout -q --detach FETCH_HEAD
-# 本地重跑时清掉上次 10_/手工改动，保证 patch 总是打在干净 tag 上。
+# 本地重跑时清掉上次 10_/sed/手工改动，保证 patch 总是打在干净源上。
 git -C KernelSU reset --hard -q HEAD
 if [ -z "${KSU_TAG}" ]; then
-  KSU_TAG="$(git -C KernelSU describe --tags --exact-match HEAD 2>/dev/null || printf '%s' "${ref}")"
+  # 联动/commit 模式没有名字：恰为 tag 提交则用 tag 名，否则退回短 SHA。
+  KSU_TAG="$(git -C KernelSU describe --tags --exact-match HEAD 2>/dev/null \
+    || git -C KernelSU rev-parse --short HEAD)"
 fi
 ksu_persist_tag
-
-# susfs4ksu：pin 到与 KSU tag 配套验证过的 commit（run #44 全绿 = KSU v3.3.1 + 此处）。
-# 10-19 上游跟随官方 main 同步后 10_ 改写，与 v3.3.1 不再配套（run #45 dispatch.c
-# hunk 失败）。升级 = 同时换 KSU_TAG 和 SUSFS_COMMIT，缺一不可。
-SUSFS_COMMIT="${SUSFS_COMMIT:-bd7d199ac87808001127e8a6d076832e2938cf0d}"
-git clone --depth=1 --branch "${SUSFS_BRANCH}" \
-  https://github.com/ShirkNeko/susfs4ksu.git "${SUSFS_DIR}"
-if [ "$(git -C "${SUSFS_DIR}" rev-parse HEAD)" != "${SUSFS_COMMIT}" ]; then
-  git -C "${SUSFS_DIR}" fetch --depth=1 origin "${SUSFS_COMMIT}"
-  git -C "${SUSFS_DIR}" checkout -q --detach FETCH_HEAD
-fi
-echo "[+] susfs4ksu @ $(git -C "${SUSFS_DIR}" rev-parse --short HEAD)"
 
 # 10_：驱动侧 SUSFS。susfs4ksu 以官方 KSU 为基准维护，此处应当干净打上；
 # 有 hunk 失败即中止（上游漂移需人工对齐，不要带病构建）。
