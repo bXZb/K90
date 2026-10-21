@@ -5,3 +5,20 @@ CONFIG_KPROBES=y
 # CONFIG_KSU_DEBUG is not set
 # Vendor cfg80211/btpower need rfkill in vmlinux (stock rfkill.ko does not load on custom Image).
 CONFIG_RFKILL=y
+
+# === Droidspaces（对照 Droidspaces v7.0.0 检查单；GKI defconfig 里这些键全是 n） ===
+# MUST：PID namespace / IPC namespace，容器两个硬门槛
+CONFIG_PID_NS=y
+CONFIG_SYSVIPC=y
+CONFIG_IPC_NS=y
+# RECOMMENDED：devtmpfs，--hw-access 硬件直通（缺则 tmpfs 兜底）
+CONFIG_DEVTMPFS=y
+# OPTIONAL：Docker/Podman/K3S 与网络/资源限制增强
+CONFIG_POSIX_MQUEUE=y
+CONFIG_CGROUP_PIDS=y
+CONFIG_CFS_BANDWIDTH=y
+CONFIG_MACVLAN=y
+CONFIG_IP6_NF_NAT=y
+CONFIG_IP6_NF_TARGET_MASQUERADE=y
+# 沙箱（非特权 Docker/Podman/Flatpak 需要）。GKI 默认关，容器玩法开。
+CONFIG_USER_NS=y
