@@ -8,11 +8,11 @@ CONFIG_RFKILL=y
 
 # === Droidspaces（对照 Droidspaces v7.0.0 检查单；GKI defconfig 里这些键全是 n） ===
 # MUST：PID namespace / IPC namespace，容器两个硬门槛
-# 二分第五轮（2026-10-21）：#59（PID_NS+SYSVIPC+IPC_NS）不启动。嵌入式 config 实证
-# 两内核仅差这三键（+SYSVIPC 连带的 COMPAT/SYSCTL），凶手在其中。本轮摘 PID_NS：
-# CONFIG_PID_NS=y
-CONFIG_SYSVIPC=y
-CONFIG_IPC_NS=y
+# 二分第六轮：#60（SYSVIPC+IPC_NS）仍不启动 → 凶手在 PID_NS 或 SYSVIPC 家族
+# （或两者皆炸）。本轮单独留 PID_NS。
+CONFIG_PID_NS=y
+# CONFIG_SYSVIPC=y
+# CONFIG_IPC_NS=y
 # 二分第四轮（2026-10-21）：#58（5 核心键）仍不启动，凶手在这 5 键内。
 # 本轮只留上面 3 个 namespace 硬需求，以下 2 键暂摘：
 # CONFIG_DEVTMPFS=y
