@@ -15,8 +15,11 @@ CONFIG_IPC_NS=y
 CONFIG_DEVTMPFS=y
 # OPTIONAL：Docker/Podman/K3S 与网络/资源限制增强
 CONFIG_POSIX_MQUEUE=y
+# --cpus CPU 限制。GKI 默认关。
+# 二分第二轮（2026-10-21）：第一轮摘 USER_NS 仍不启动，此键成头号嫌疑——
+# 改写 fair.c 编译产物（节流进调度热路径），高通/小米调度 vendor hook 所在文件。
+# CONFIG_CFS_BANDWIDTH=y
 CONFIG_CGROUP_PIDS=y
-CONFIG_CFS_BANDWIDTH=y
 CONFIG_MACVLAN=y
 CONFIG_IP6_NF_NAT=y
 CONFIG_IP6_NF_TARGET_MASQUERADE=y
