@@ -15,14 +15,12 @@ CONFIG_IPC_NS=y
 CONFIG_DEVTMPFS=y
 # OPTIONAL：Docker/Podman/K3S 与网络/资源限制增强
 CONFIG_POSIX_MQUEUE=y
-# --cpus CPU 限制。GKI 默认关。
-# 二分第二轮（2026-10-21）：第一轮摘 USER_NS 仍不启动，此键成头号嫌疑——
-# 改写 fair.c 编译产物（节流进调度热路径），高通/小米调度 vendor hook 所在文件。
-# CONFIG_CFS_BANDWIDTH=y
-CONFIG_CGROUP_PIDS=y
-CONFIG_MACVLAN=y
-CONFIG_IP6_NF_NAT=y
-CONFIG_IP6_NF_TARGET_MASQUERADE=y
+# 二分第三轮（折半）：#56（摘 USER_NS）、#57（再摘 CFS_BANDWIDTH）均不启动，
+# 嫌疑剩 9 键。本轮只留 5 核心键，以下 4 键暂摘：
+# CONFIG_CGROUP_PIDS=y
+# CONFIG_MACVLAN=y
+# CONFIG_IP6_NF_NAT=y
+# CONFIG_IP6_NF_TARGET_MASQUERADE=y
 # 沙箱（非特权 Docker/Podman/Flatpak）。GKI 默认关。
 # 真机排查（2026-10-21）：含此键的 #53/#55 fastboot boot 不启动（#54 无此键可启动），
 # 摘掉观察；cred/nsproxy 热路径与厂商安全钩子交互是头号嫌疑。
