@@ -48,9 +48,17 @@ if [ -z "${KSU_TAG}" ]; then
 fi
 ksu_persist_tag
 
-# susfs4ksu：gki-android15-6.6 分支无 tag，用移动 HEAD（与 SukiSU 线一致裸跟随）。
+# susfs4ksu：pin 到与 KSU tag 配套验证过的 commit（run #44 全绿 = KSU v3.3.1 + 此处）。
+# 10-19 上游跟随官方 main 同步后 10_ 改写，与 v3.3.1 不再配套（run #45 dispatch.c
+# hunk 失败）。升级 = 同时换 KSU_TAG 和 SUSFS_COMMIT，缺一不可。
+SUSFS_COMMIT="${SUSFS_COMMIT:-bd7d199ac87808001127e8a6d076832e2938cf0d}"
 git clone --depth=1 --branch "${SUSFS_BRANCH}" \
   https://github.com/ShirkNeko/susfs4ksu.git "${SUSFS_DIR}"
+if [ "$(git -C "${SUSFS_DIR}" rev-parse HEAD)" != "${SUSFS_COMMIT}" ]; then
+  git -C "${SUSFS_DIR}" fetch --depth=1 origin "${SUSFS_COMMIT}"
+  git -C "${SUSFS_DIR}" checkout -q --detach FETCH_HEAD
+fi
+echo "[+] susfs4ksu @ $(git -C "${SUSFS_DIR}" rev-parse --short HEAD)"
 
 # 10_：驱动侧 SUSFS。susfs4ksu 以官方 KSU 为基准维护，此处应当干净打上；
 # 有 hunk 失败即中止（上游漂移需人工对齐，不要带病构建）。
