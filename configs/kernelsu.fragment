@@ -20,5 +20,7 @@ CONFIG_CFS_BANDWIDTH=y
 CONFIG_MACVLAN=y
 CONFIG_IP6_NF_NAT=y
 CONFIG_IP6_NF_TARGET_MASQUERADE=y
-# 沙箱（非特权 Docker/Podman/Flatpak 需要）。GKI 默认关，容器玩法开。
-CONFIG_USER_NS=y
+# 沙箱（非特权 Docker/Podman/Flatpak）。GKI 默认关。
+# 真机排查（2026-10-21）：含此键的 #53/#55 fastboot boot 不启动（#54 无此键可启动），
+# 摘掉观察；cred/nsproxy 热路径与厂商安全钩子交互是头号嫌疑。
+# CONFIG_USER_NS=y
