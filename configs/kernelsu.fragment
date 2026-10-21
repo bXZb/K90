@@ -6,24 +6,25 @@ CONFIG_KPROBES=y
 # Vendor cfg80211/btpower need rfkill in vmlinux (stock rfkill.ko does not load on custom Image).
 CONFIG_RFKILL=y
 
-# === Droidspaces（对照 Droidspaces v7.0.0 检查单；GKI defconfig 里这些键全是 n） ===
-# MUST：PID namespace / IPC namespace，容器两个硬门槛
-# 二分第六轮：#60（SYSVIPC+IPC_NS）仍不启动 → 凶手在 PID_NS 或 SYSVIPC 家族
-# （或两者皆炸）。本轮单独留 PID_NS。
+# === Droidspaces（对照 Droidspaces-OSS 官方 GKI 配置文档） ===
+# SYSVIPC/IPC_NS/POSIX_MQUEUE 会移动 task_struct ABI（sysvsem/sysvshm 字段），
+# vendor 模块 CRC 失配 → bootloop。必须配合 configs/sysvipc-kabi-6_7_8.patch
+# （02 应用：两字段挪进 ANDROID_KABI 预留位）。#56–#61 二分 + 作者文档双重实证。
+# MUST：容器两个硬门槛
 CONFIG_PID_NS=y
-# CONFIG_SYSVIPC=y
-# CONFIG_IPC_NS=y
-# 二分第四轮（2026-10-21）：#58（5 核心键）仍不启动，凶手在这 5 键内。
-# 本轮只留上面 3 个 namespace 硬需求，以下 2 键暂摘：
-# CONFIG_DEVTMPFS=y
-# CONFIG_POSIX_MQUEUE=y
-# 二分第三轮（折半）：#56（摘 USER_NS）、#57（再摘 CFS_BANDWIDTH）均不启动，
-# 嫌疑剩 9 键。本轮只留 5 核心键，以下 4 键暂摘：
+CONFIG_SYSVIPC=y
+CONFIG_IPC_NS=y
+# RECOMMENDED：--hw-access 硬件直通（缺则 tmpfs 兜底）
+CONFIG_DEVTMPFS=y
+# OPTIONAL：作者标注 GKI ABI-safe
+CONFIG_POSIX_MQUEUE=y
+CONFIG_MACVLAN=y
+CONFIG_IP6_NF_NAT=y
+CONFIG_IP6_NF_TARGET_MASQUERADE=y
+# 沙箱（非特权 Docker/Podman/Flatpak）。作者标注 GKI ABI-safe。
+CONFIG_USER_NS=y
+# CFS_BANDWIDTH / CGROUP_PIDS：作者明确警告——改调度器/cgroup 结构体大小、
+# 波及约四千导出符号 CRC，kABI 补丁救不了，vendor 模块会拒载。保持禁用
+# （--cpus / --pids-limit 功能随之放弃）。
+# CONFIG_CFS_BANDWIDTH=y
 # CONFIG_CGROUP_PIDS=y
-# CONFIG_MACVLAN=y
-# CONFIG_IP6_NF_NAT=y
-# CONFIG_IP6_NF_TARGET_MASQUERADE=y
-# 沙箱（非特权 Docker/Podman/Flatpak）。GKI 默认关。
-# 真机排查（2026-10-21）：含此键的 #53/#55 fastboot boot 不启动（#54 无此键可启动），
-# 摘掉观察；cred/nsproxy 热路径与厂商安全钩子交互是头号嫌疑。
-# CONFIG_USER_NS=y

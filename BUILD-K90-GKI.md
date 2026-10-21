@@ -239,7 +239,9 @@ getprop debug.device.bluetooth_state  # 1
 
 有：6.6.77 4K 同代 GKI、内置官方 KernelSU、SUSFS（`SUS_PATH=n`，无 `SUS_SU` 此键）、`RFKILL` 内置、hide_stuff、TTL/HL、BBR 编进内核但默认 cubic、uname 无 dirty、去掉 protected exports。
 
-本分支追加 **Droidspaces 容器配置**（对照 v7.0.0 检查单，键全在 `configs/kernelsu.fragment`）：PID_NS / SYSVIPC / IPC_NS（必需）、DEVTMPFS（--hw-access）、POSIX_MQUEUE / CGROUP_PIDS / CFS_BANDWIDTH / MACVLAN / IP6_NF_NAT / IP6_NF_TARGET_MASQUERADE / USER_NS（容器与网络增强）。真机跑 Droidspaces 检查应全绿；另需在管理器里关掉 SUSFS 的 "hide sus mounts for all processes"，否则容器起不来。
+本分支追加 **Droidspaces 容器配置**（对照 Droidspaces-OSS 官方 GKI 文档，键全在 `configs/kernelsu.fragment`）：PID_NS / SYSVIPC / IPC_NS（必需）、DEVTMPFS（--hw-access）、POSIX_MQUEUE / MACVLAN / IP6_NF_NAT / IP6_NF_TARGET_MASQUERADE / USER_NS（容器与网络增强）。
+
+**关键：`SYSVIPC` 系会移动 task_struct ABI（sysvsem/sysvshm），vendor 模块 CRC 失配直接 bootloop**（#56–#61 二分 + 官方文档双重实证）。解法 = `configs/sysvipc-kabi-6_7_8.patch`（02 自动应用：两字段挪进 ANDROID_KABI 预留位，布局不变）；slot 不匹配时换同目录其他编号变体。`CFS_BANDWIDTH`/`CGROUP_PIDS` 改约四千符号 CRC、无补丁可救，**保持禁用**（放弃 --cpus/--pids-limit）。另需在管理器里关掉 SUSFS 的 "hide sus mounts for all processes"，否则容器起不来。
 
 没有：KPM（官方 KernelSU 无此功能）、ZRAM 魔改、BBG、默认 BBR、一加补丁、小米未开源 DTS/驱动。
 

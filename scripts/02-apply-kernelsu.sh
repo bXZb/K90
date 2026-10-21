@@ -123,6 +123,14 @@ cd "${KERNEL_ROOT}"
 patch -p1 --forward --fuzz=3 \
   < "${SUSFS_DIR}/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch"
 
+# Droidspaces：SYSVIPC/IPC_NS/POSIX_MQUEUE 会给 task_struct 中段加
+# sysvsem/sysvshm 字段、移动 KMI——release 串与官方一致时 vendor 模块照常
+# 加载但 CRC 失配，直接 bootloop（二分 #56–#61 + Droidspaces-OSS 文档双重实证）。
+# kABI 补丁把两字段挪进 ANDROID_KABI 预留位 6/7+8，布局不变。若本树 slot
+# 不匹配，换 configs/ 里其余编号变体。
+patch -p1 --forward --no-backup-if-mismatch \
+  < "${ROOT}/configs/sysvipc-kabi-6_7_8.patch"
+
 # 10_ Kconfig 菜单与 SukiSU builtin 同名同构（默认全 y）；显式写出防上游默认漂移。
 # 取值对齐已验证的 builtin 配置（SUS_PATH=n、SUS_SU 无此键勿加）。
 # 官方 Kconfig 无 KSU_MANUAL_SU / KSU_FEATURE_ADBROOT，不要写。
