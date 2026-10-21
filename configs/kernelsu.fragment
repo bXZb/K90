@@ -11,10 +11,10 @@ CONFIG_RFKILL=y
 CONFIG_PID_NS=y
 CONFIG_SYSVIPC=y
 CONFIG_IPC_NS=y
-# RECOMMENDED：devtmpfs，--hw-access 硬件直通（缺则 tmpfs 兜底）
-CONFIG_DEVTMPFS=y
-# OPTIONAL：Docker/Podman/K3S 与网络/资源限制增强
-CONFIG_POSIX_MQUEUE=y
+# 二分第四轮（2026-10-21）：#58（5 核心键）仍不启动，凶手在这 5 键内。
+# 本轮只留上面 3 个 namespace 硬需求，以下 2 键暂摘：
+# CONFIG_DEVTMPFS=y
+# CONFIG_POSIX_MQUEUE=y
 # 二分第三轮（折半）：#56（摘 USER_NS）、#57（再摘 CFS_BANDWIDTH）均不启动，
 # 嫌疑剩 9 键。本轮只留 5 核心键，以下 4 键暂摘：
 # CONFIG_CGROUP_PIDS=y
