@@ -79,6 +79,11 @@ else
     patch -p1 --forward --fuzz=3 -d "${KSU}" \
       < "${ROOT}/configs/builtin-event-services.patch"
   fi
+  # 上游 builtin v4.2.1（41029）回归：manager/throne_tracker.c 的
+  # my_dir_context 初始化缺分号，任何树内构建都编不过。
+  # 上游补上后行尾已是 };，此 sed 不再命中，自动退役。
+  sed -i 's/\.depth = pos->depth }$/\.depth = pos->depth };/' \
+    "${KSU}/kernel/manager/throne_tracker.c"
   # 42d7fda 管理器只认 [ksu_driver]，开机不扫已装 APK 就永远不会注入 fd。
   if ! grep -q 'track_throne(false);' "${KSU}/kernel/runtime/ksud.c"; then
     patch -p1 --forward --fuzz=3 -d "${KSU}" \
