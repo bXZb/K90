@@ -5,3 +5,26 @@ CONFIG_KPROBES=y
 # CONFIG_KSU_DEBUG is not set
 # Vendor cfg80211/btpower need rfkill in vmlinux (stock rfkill.ko does not load on custom Image).
 CONFIG_RFKILL=y
+
+# === Droidspaces（对照 Droidspaces-OSS 官方 GKI 配置文档） ===
+# SYSVIPC/IPC_NS/POSIX_MQUEUE 会移动 task_struct ABI（sysvsem/sysvshm 字段），
+# vendor 模块 CRC 失配 → bootloop。必须配合 configs/sysvipc-kabi-6_7_8.patch
+# （02 应用：两字段挪进 ANDROID_KABI 预留位）。#56–#61 二分 + 作者文档双重实证。
+# MUST：容器两个硬门槛
+CONFIG_PID_NS=y
+CONFIG_SYSVIPC=y
+CONFIG_IPC_NS=y
+# RECOMMENDED：--hw-access 硬件直通（缺则 tmpfs 兜底）
+CONFIG_DEVTMPFS=y
+# OPTIONAL：作者标注 GKI ABI-safe
+CONFIG_POSIX_MQUEUE=y
+CONFIG_MACVLAN=y
+CONFIG_IP6_NF_NAT=y
+CONFIG_IP6_NF_TARGET_MASQUERADE=y
+# 沙箱（非特权 Docker/Podman/Flatpak）。作者标注 GKI ABI-safe。
+CONFIG_USER_NS=y
+# CFS_BANDWIDTH / CGROUP_PIDS：作者明确警告——改调度器/cgroup 结构体大小、
+# 波及约四千导出符号 CRC，kABI 补丁救不了，vendor 模块会拒载。保持禁用
+# （--cpus / --pids-limit 功能随之放弃）。
+# CONFIG_CFS_BANDWIDTH=y
+# CONFIG_CGROUP_PIDS=y
