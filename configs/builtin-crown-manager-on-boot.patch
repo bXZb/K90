@@ -1,0 +1,26 @@
+K90 builtin: crown already-installed manager at first zygote
+
+SukiSU-Ultra manager 42d7fda / 40900 only looks for an injected
+[ksu_driver] fd. It never calls reboot(0xDEADBEEF, 0xCAFEBABE) itself.
+The kernel injects that fd on zygote setresuid only after throne_tracker
+has matched the APK signature. Upstream only searches /data/app when
+packages.list changes, and boot-completed is prune-only (and needs
+ksud). After fastboot boot the manager is already installed, so it is
+never crowned and the official APK shows 未安装.
+
+Call track_throne(false) from on_post_fs_data (first zygote, /data
+ready). Skip once builtin searches at this point.
+
+--- a/kernel/runtime/ksud.c
++++ b/kernel/runtime/ksud.c
+@@ -52,6 +52,10 @@
+ 
+     ksu_load_allow_list();
+     ksu_observer_init();
++    /* Official manager never probes reboot(); it needs a crowned UID so
++     * zygote setresuid can inject [ksu_driver]. Search /data/app now.
++     */
++    track_throne(false);
+     // sanity check, this may influence the performance
+     stop_input_hook();
+     ksu_selinux_hide_handle_post_fs_data();
