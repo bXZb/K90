@@ -36,10 +36,10 @@ if [ -n "${KSU_COMMIT}" ]; then
 elif [ -n "${KSU_TAG}" ]; then
   ref="${KSU_TAG}"
 else
-  # main 在 2026-10-10 被作者封禁 susfs 构建（susfs_compat.mk 无条件 error，
-  # "suspend susfs build"，等 simonpunk 同步官方 preinit）；sync-susfs 是解封
-  # 现场（无 error，10-19 活跃）。
-  ref="sync-susfs"
+  # 2026-10-10 起作者曾封禁 main 的 susfs 构建（等 simonpunk 同步官方 API），
+  # 2026-10-24 解封并适配完毕（susfs_compat 的 error 移除、驱动 __maybe_static
+  # 机制按新 50_ 自动导出 selinux 钩子，issue #624 作者确认）。回归默认 main。
+  ref="main"
 fi
 
 cd "${KERNEL_ROOT}"
@@ -108,19 +108,9 @@ cd "${KERNEL_ROOT}"
 # --fuzz=3：base.c 等文件的 hunk 需要模糊匹配（kernelsu-official run #44/#64 同参数实证）。
 patch -p1 --forward --fuzz=3 --no-backup-if-mismatch \
   < "${SUSFS_DIR}/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch"
-
-# 现行 50_ 的 selinuxfs.c extern 引用全局 my_write_context/my_write_access
-# （内核侧 SEL_CONTEXT/SEL_ACCESS 钩子的实现），BakaSU 驱动在 selinux_hide.c
-# 里已有完整实现但标记为 static（run #75 链接实证）——把两处定义去 static
-# 即按 50_ 预期导出，驱动内部调用不受影响。上游把定义改全局/改接口后此 sed
-# 不再命中（前者自然失效，后者 fail loud）。
-sed -i \
-  -e 's/^static ssize_t my_write_context(struct file \*file/ssize_t my_write_context(struct file *file/' \
-  -e 's/^static ssize_t my_write_access(struct file \*file/ssize_t my_write_access(struct file *file/' \
-  "${KSU}/kernel/feature/selinux_hide.c"
-grep -q '^ssize_t my_write_context' "${KSU}/kernel/feature/selinux_hide.c" \
-  || { echo "ERROR: my_write export sed did not apply to selinux_hide.c" >&2; exit 1; }
-echo "[+] selinux_hide.c my_write_* exported (grep verified)"
+# 50_ 打入 hooks.c 后含 ksu_selinux_hide_running → susfs_compat.mk 自动定义
+# KSU_COMPAT_HAS_SUSFS_FEATURE_SELINUX_HIDE → 驱动 __maybe_static 置空，
+# my_setprocattr/my_write_* 以全局符号供 50_ 的 extern 引用（原生机制，勿动）。
 
 # Droidspaces kABI 补丁（打在 GKI 树 sched.h；上下文 = AOSP r15 原味）。
 patch -p1 --forward --no-backup-if-mismatch \

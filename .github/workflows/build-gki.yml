@@ -26,11 +26,11 @@ on:
         type: string
         default: auto
       ksu_tag:
-        description: "BakaSU 的 git tag / branch / commit。空 = sync-susfs 分支（main 已封禁 susfs 构建）"
+        description: "BakaSU 的 git tag / branch / commit。空 = main HEAD（10-24 起已恢复 susfs 支持）"
         type: string
         default: ""
       susfs_commit:
-        description: "ShirkNeko/susfs4ksu 的 commit。空 = 跟随 HEAD（与 sync-susfs 驱动配套，50_ 用 KSU_NO_PREINIT 裁掉 preinit）"
+        description: "ShirkNeko/susfs4ksu 的 commit。空 = 跟随 HEAD（与 main 驱动配套，50_ 的 preinit 用 KSU_NO_PREINIT 裁掉）"
         type: string
         default: ""
       create_release:
