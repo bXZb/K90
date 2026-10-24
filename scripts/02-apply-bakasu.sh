@@ -65,6 +65,13 @@ grep -q "kernelsu" "${DRIVER_DIR}/Makefile" \
 grep -q 'source "drivers/kernelsu/Kconfig"' "${DRIVER_DIR}/Kconfig" \
   || sed -i '/endmenu/i\source "drivers/kernelsu/Kconfig"' "${DRIVER_DIR}/Kconfig"
 
+# kleaf 沙箱物化源树时 bazel 会剔除 .git，BakaSU Kbuild 的守卫与版本自举
+# （rev-list count）依赖驱动目录旁的 .git，沙箱内必炸（run #72 实证）。
+# 按其 Kbuild 内注释给 bazel 的指引：KSU_SRC 钉到真实 clone 的绝对路径
+# （02 与 04 同一次构建内路径一致，本地/CI 通用）。上游改掉该行则 sed
+# 不命中，沙箱守卫 fail loud。
+sed -i "s|^KSU_SRC := .*|KSU_SRC := ${KSU}/kernel|" "${KSU}/kernel/Kbuild"
+
 # Droidspaces fragment → defconfig。
 FRAGMENT="${ROOT}/configs/bakasu.fragment"
 while IFS= read -r line; do
