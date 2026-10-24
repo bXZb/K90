@@ -109,6 +109,16 @@ cd "${KERNEL_ROOT}"
 patch -p1 --forward --fuzz=3 --no-backup-if-mismatch \
   < "${SUSFS_DIR}/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch"
 
+# 现行 50_ 的 selinuxfs.c extern 引用全局 my_write_context/my_write_access
+# （内核侧 SEL_CONTEXT/SEL_ACCESS 钩子的实现），BakaSU 驱动在 selinux_hide.c
+# 里已有完整实现但标记为 static（run #75 链接实证）——把两处定义去 static
+# 即按 50_ 预期导出，驱动内部调用不受影响。上游把定义改全局/改接口后此 sed
+# 不再命中（前者自然失效，后者 fail loud）。
+sed -i \
+  -e 's/^static ssize_t my_write_context(struct file \*file/ssize_t my_write_context(struct file *file/' \
+  -e 's/^static ssize_t my_write_access(struct file \*file/ssize_t my_write_access(struct file *file/' \
+  "${KSU}/kernel/feature/selinux_hide.c"
+
 # Droidspaces kABI 补丁（打在 GKI 树 sched.h；上下文 = AOSP r15 原味）。
 patch -p1 --forward --no-backup-if-mismatch \
   < "${ROOT}/configs/sysvipc-kabi-6_7_8.patch"
