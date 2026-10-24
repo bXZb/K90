@@ -32,7 +32,10 @@ if [ -n "${KSU_COMMIT}" ]; then
 elif [ -n "${KSU_TAG}" ]; then
   ref="${KSU_TAG}"
 else
-  ref="main"
+  # main 在 2026-10-10 被作者封禁 susfs 构建（susfs_compat.mk 无条件 error，
+  # "suspend susfs build"，等 simonpunk 同步官方 preinit）；sync-susfs 是解封
+  # 现场（无 error，10-19 活跃）。
+  ref="sync-susfs"
 fi
 
 cd "${KERNEL_ROOT}"

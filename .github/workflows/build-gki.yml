@@ -26,7 +26,7 @@ on:
         type: string
         default: auto
       ksu_tag:
-        description: "BakaSU 的 git tag / branch / commit。空 = main HEAD"
+        description: "BakaSU 的 git tag / branch / commit。空 = sync-susfs 分支（main 已封禁 susfs 构建）"
         type: string
         default: ""
       susfs_commit:

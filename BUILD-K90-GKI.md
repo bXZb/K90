@@ -4,7 +4,7 @@
 
 已验证事实（2026-10-24 预检 + dry-run）：
 
-- `susfs@bd7d199a` 的 50_ 对 BakaSU main **0 hunk 失败**（BakaSU 基座在官方 preinit API 合入前，现行 susfs HEAD 的 50_ 引用 `ksu_preinit_*` 会链接失败——SukiSU main 同病，这就是 pin 的原因）。
+- `susfs@bd7d199a` 的 50_ 打 r15 树需 --fuzz=3（base.c hunk）。BakaSU 基座在官方 preinit API 合入前，现行 susfs HEAD 的 50_ 引用 `ksu_preinit_*` 会链接失败——这就是 pin 的原因。BakaSU **main 分支 10-10 起封禁 susfs 构建**（susfs_compat.mk 无条件 error，作者挂起等 simonpunk 同步）；默认用 **sync-susfs 分支**（解封现场，Kbuild 无 error）。
 - BakaSU **原生自带 KSU_SUSFS Kconfig 菜单**（10 项）→ 不需要 susfs 的 10_ 驱动补丁。
 - Droidspaces kABI 补丁上下文 = AOSP r15 原味 sched.h（1075/1508 行）。
 - CFS_BANDWIDTH / CGROUP_PIDS 无 padding 可救（约 4k 符号 CRC），**永久禁用**——`--cpus`/`--pids-limit` 放弃。
@@ -22,7 +22,7 @@ AOSP_DIST="$ROOT/out/aosp-release" BUILD_JOBS=3 LTO=thin \
 bash scripts/05-pack-anykernel.sh
 ```
 
-CI：Actions "Build K90 GKI (BakaSU)"，输入 `ksu_tag`（空 = main HEAD）/ `susfs_commit`（空 = 配套 pin `bd7d199a`）/ `lto` / `jobs` / `create_release`。
+CI：Actions "Build K90 GKI (BakaSU)"，输入 `ksu_tag`（空 = **sync-susfs 分支**）/ `susfs_commit`（空 = 配套 pin `bd7d199a`）/ `lto` / `jobs` / `create_release`。
 
 ## 验收
 
