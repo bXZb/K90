@@ -5,15 +5,19 @@ set -euo pipefail
 #
 # 关键配对事实（2026-10-24 预检 + dry-run 实证）：
 # - BakaSU 原生自带 KSU_SUSFS Kconfig 菜单 → 不需要 susfs 的 10_ 驱动侧补丁。
-# - susfs 内核侧 50_ 必须用 **preinit 合入之前**的版本（BakaSU 基座尚无官方
-#   preinit API）：pin SUSFS_COMMIT=bd7d199a（10-12 版，0 hunk 失败）。
-#   BakaSU sync-upstream 带入 preinit 后可解 pin（KSU_PREINIT=1 检测，届时改）。
+# - BakaSU main 自 10-10 封禁 susfs 构建（susfs_compat.mk 无条件 error），默认用
+#   sync-susfs 分支（解封现场，驱动已适配现行 susfs API）。
+# - susfs 50_ 用**现行 HEAD**：其 selinuxfs.c 不再引用 _with_policy（bd7d199a 旧
+#   版引用、定义在 10_ 驱动侧，BakaSU 不打 10_ 必链接炸——run #74 实证）；对 r15
+#   树 dry-run 0 失败。其 preinit 依赖（BakaSU 基座无官方 preinit API）用 50_
+#   自带的 KSU_NO_PREINIT 宏整体禁用：符号盘点 23 个 ksu_* 中仅 5 个 preinit 系
+#   缺失且全部位于该宏守卫内。
 # - Droidspaces：SYSVIPC 系移动 task_struct ABI（sysvsem/sysvshm），vendor 模块
 #   CRC 失配 → bootloop（K90 真机 6 轮二分实证）。kABI 补丁把两字段挪进
 #   ANDROID_KABI 预留位 6/7+8，布局不变。CFS_BANDWIDTH/CGROUP_PIDS 无补丁可救，
 #   永久禁用。
 #
-# 覆盖输入：KSU_TAG/KSU_COMMIT（BakaSU tag/commit）、SUSFS_COMMIT。
+# 覆盖输入：KSU_TAG/KSU_COMMIT（BakaSU tag/commit）、SUSFS_COMMIT（susfs pin）。
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KERNEL_ROOT="${ROOT}/gki/common"
@@ -23,8 +27,8 @@ KSU_TAG="${KSU_TAG:-}"
 KSU_COMMIT="${KSU_COMMIT:-}"
 SUSFS_DIR="${ROOT}/third_party/susfs4ksu"
 SUSFS_BRANCH="gki-android15-6.6"
-# preinit 合入前的最后一版 50_（对 BakaSU main dry-run 0 hunk 失败，2026-10-24）。
-SUSFS_COMMIT="${SUSFS_COMMIT:-bd7d199ac87808001127e8a6d076832e2938cf0d}"
+# 默认跟随现行 HEAD（与 sync-susfs 驱动配套，见文件头）；要复现旧组合时覆盖。
+SUSFS_COMMIT="${SUSFS_COMMIT:-}"
 GKI_DEFCONFIG="${KERNEL_ROOT}/arch/arm64/configs/gki_defconfig"
 
 if [ -n "${KSU_COMMIT}" ]; then
@@ -51,10 +55,10 @@ git -C KernelSU reset --hard -q HEAD
 KSU_SHA="$(git -C KernelSU rev-parse --short HEAD)"
 echo "[+] BakaSU integrated (${ref} @ ${KSU_SHA})"
 
-# susfs 内核侧（50_ + fs/include），pin 到与 BakaSU 基座配套的 commit。
+# susfs 内核侧（50_ + fs/include），默认跟随 HEAD（与 sync-susfs 驱动配套）。
 git clone --depth=1 --branch "${SUSFS_BRANCH}" \
   https://github.com/ShirkNeko/susfs4ksu.git "${SUSFS_DIR}"
-if [ "$(git -C "${SUSFS_DIR}" rev-parse HEAD)" != "${SUSFS_COMMIT}" ]; then
+if [ -n "${SUSFS_COMMIT}" ]; then
   git -C "${SUSFS_DIR}" fetch --depth=1 origin "${SUSFS_COMMIT}"
   git -C "${SUSFS_DIR}" checkout -q --detach FETCH_HEAD
 fi
@@ -92,6 +96,14 @@ done < "${FRAGMENT}"
 # 内核侧 SUSFS：fs/include 覆盖 + 50_（干净打上，失败即中止——预检 0 失败）。
 cp -a "${SUSFS_DIR}/kernel_patches/fs/." "${KERNEL_ROOT}/fs/"
 cp -a "${SUSFS_DIR}/kernel_patches/include/linux/." "${KERNEL_ROOT}/include/linux/"
+
+# 现行 50_ 的 exec.c preinit 依赖（BakaSU 基座无官方 preinit API）用 50_ 自带
+# 的兼容宏整体禁用；exec.c include 的 susfs_def.h 是该宏的精确注入点
+# （符号盘点：50_ 引用的 23 个 ksu_* 中仅 5 个 preinit 系缺失，全在宏守卫内）。
+# BakaSU sync-upstream 带入 preinit 后移除本注入。
+sed -i '1i /* BakaSU: no official preinit API yet; disable 50_ preinit path (see 02). */\n#define KSU_NO_PREINIT\n' \
+  "${KERNEL_ROOT}/include/linux/susfs_def.h"
+
 cd "${KERNEL_ROOT}"
 # --fuzz=3：base.c 等文件的 hunk 需要模糊匹配（kernelsu-official run #44/#64 同参数实证）。
 patch -p1 --forward --fuzz=3 --no-backup-if-mismatch \

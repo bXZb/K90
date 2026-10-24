@@ -1,10 +1,11 @@
 # K90 BakaSU GKI 构建手册
 
-本分支（`bakasu-gki-fresh`）是**全新流水线**，不继承 main 的任何历史：BakaSU（ReSukiSU，官方 KernelSU v3.x 架构 + 原生 SUSFS 菜单）+ SUSFS + Droidspaces 容器配置。
+本分支（`bakasu-gki`）是**全新流水线**，不继承 main 的任何历史：BakaSU（ReSukiSU，官方 KernelSU v3.x 架构 + 原生 SUSFS 菜单）+ SUSFS + Droidspaces 容器配置。
 
 已验证事实（2026-10-24 预检 + dry-run）：
 
-- `susfs@bd7d199a` 的 50_ 打 r15 树需 --fuzz=3（base.c hunk）。BakaSU 基座在官方 preinit API 合入前，现行 susfs HEAD 的 50_ 引用 `ksu_preinit_*` 会链接失败——这就是 pin 的原因。BakaSU **main 分支 10-10 起封禁 susfs 构建**（susfs_compat.mk 无条件 error，作者挂起等 simonpunk 同步）；默认用 **sync-susfs 分支**（解封现场，Kbuild 无 error）。
+- **BakaSU 用 `sync-susfs` 分支**（驱动已适配现行 susfs API；main 自 10-10 封禁 susfs 构建——susfs_compat.mk 无条件 error，作者挂起等 simonpunk 同步）。
+- **50_ 跟随现行 HEAD**：selinuxfs.c 不再引用 `_with_policy`（旧版 bd7d199a 的引用定义在 10_ 驱动侧，BakaSU 不打 10_ 必链接炸，run #74 实证）；对 r15 树 dry-run 0 失败（--fuzz=3）。preinit 依赖（BakaSU 基座暂无该 API）用 50_ 自带的 `KSU_NO_PREINIT` 宏禁用——02 往 `susfs_def.h` 顶部注入；BakaSU 带入 preinit 后移除。
 - BakaSU **原生自带 KSU_SUSFS Kconfig 菜单**（10 项）→ 不需要 susfs 的 10_ 驱动补丁。
 - Droidspaces kABI 补丁上下文 = AOSP r15 原味 sched.h（1075/1508 行）。
 - CFS_BANDWIDTH / CGROUP_PIDS 无 padding 可救（约 4k 符号 CRC），**永久禁用**——`--cpus`/`--pids-limit` 放弃。
@@ -22,7 +23,7 @@ AOSP_DIST="$ROOT/out/aosp-release" BUILD_JOBS=3 LTO=thin \
 bash scripts/05-pack-anykernel.sh
 ```
 
-CI：Actions "Build K90 GKI (BakaSU)"，输入 `ksu_tag`（空 = **sync-susfs 分支**）/ `susfs_commit`（空 = 配套 pin `bd7d199a`）/ `lto` / `jobs` / `create_release`。
+CI：Actions "Build K90 GKI (BakaSU)"，输入 `ksu_tag`（空 = **sync-susfs 分支**）/ `susfs_commit`（空 = 跟随现行 HEAD，与 sync-susfs 驱动配套）/ `lto` / `jobs` / `create_release`。
 
 ## 验收
 

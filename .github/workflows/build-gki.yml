@@ -30,7 +30,7 @@ on:
         type: string
         default: ""
       susfs_commit:
-        description: "ShirkNeko/susfs4ksu 的 commit。空 = 配套 pin（bd7d199a，preinit 前）"
+        description: "ShirkNeko/susfs4ksu 的 commit。空 = 跟随 HEAD（与 sync-susfs 驱动配套，50_ 用 KSU_NO_PREINIT 裁掉 preinit）"
         type: string
         default: ""
       create_release:
