@@ -1,0 +1,136 @@
+# REDMI K90 (annibale) — AOSP GKI 6.6.77 + BakaSU + SUSFS + Droidspaces
+#
+# 全新流水线（无 main 历史包袱）：00→01→02→03→04→05。不要编 16K。
+# 标准 GitHub-hosted runner（约 4 核 / 16GB）用 BUILD_JOBS=3、LTO=thin。
+# 磁盘：endersonmenezes/free-disk-space@v3（已验证清完约 55G）。
+# 不要用 maximize-build-space：这台镜像没有独立 /mnt，LVM 会把根分区吃光。
+
+name: Build K90 GKI (BakaSU)
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "GitHub-hosted 镜像，或自建 runner 标签（如 self-hosted）"
+        type: string
+        default: ubuntu-22.04
+      lto:
+        description: "LTO（thin = 已验证配置；none = 更快、仅调试）"
+        type: choice
+        default: thin
+        options:
+          - thin
+          - none
+      jobs:
+        description: "bazel --jobs（auto = 按 CPU/内存估算）"
+        type: string
+        default: auto
+      ksu_tag:
+        description: "BakaSU 的 git tag / branch / commit。空 = main HEAD"
+        type: string
+        default: ""
+      susfs_commit:
+        description: "ShirkNeko/susfs4ksu 的 commit。空 = 配套 pin（bd7d199a，preinit 前）"
+        type: string
+        default: ""
+      create_release:
+        description: "构建成功后发布 GitHub Release"
+        type: boolean
+        default: false
+  push:
+    branches:
+      - bakasu-gki
+    paths:
+      - "scripts/**"
+      - "configs/**"
+      - ".github/workflows/build-gki.yml"
+      - ".github/actions/**"
+
+concurrency:
+  group: k90-gki-bakasu-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+  GKI_MANIFEST_BRANCH: common-android15-6.6
+  GKI_KERNEL_TAG: android15-6.6-2025-03_r15
+  EXPECTED_UNAME: 6.6.77-android15-8-g4a507830d890-4k
+
+jobs:
+  build:
+    name: aosp-release 4K
+    runs-on: ${{ github.event.inputs.runner || 'ubuntu-22.04' }}
+    timeout-minutes: 360
+    env:
+      LTO: ${{ github.event.inputs.lto || 'thin' }}
+      BUILD_JOBS: ${{ github.event.inputs.jobs || 'auto' }}
+      KSU_TAG: ${{ github.event.inputs.ksu_tag || '' }}
+      SUSFS_COMMIT: ${{ github.event.inputs.susfs_commit || '' }}
+
+    steps:
+      - name: Checkout seed
+        uses: actions/checkout@v4
+
+      - name: Build environment setup
+        uses: ./.github/actions/gki-setup
+        with:
+          free_disk: ${{ startsWith(github.event.inputs.runner || 'ubuntu-22.04', 'ubuntu-') }}
+
+      - name: Sync AOSP GKI (01)
+        run: bash scripts/01-sync-aosp-gki.sh
+
+      - name: Apply BakaSU + SUSFS + Droidspaces (02)
+        run: bash scripts/02-apply-bakasu.sh
+
+      - name: Apply GKI tuning (03)
+        run: bash scripts/03-apply-gki-tuning.sh
+
+      - name: Build GKI (04)
+        run: bash scripts/04-build-gki.sh
+
+      - name: Pack AnyKernel3 (05)
+        run: bash scripts/05-pack-anykernel.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BakaSU-annibale-aosp-6.6.77-4k-SUSFS-REL-${{ github.run_number }}
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            out/aosp-release/boot-lz4.img
+            out/aosp-release/boot-gz.img
+            out/aosp-release/boot.img
+            out/aosp-release/Image
+            out/aosp-release/Image.gz
+            out/aosp-release/Image.lz4
+            out/aosp-release/System.map
+            out/BakaSU*-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip
+
+      - name: Publish GitHub Release
+        if: ${{ github.ref_type == 'tag' || inputs.create_release }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('ci-{0}', github.run_number) }}
+          name: K90 GKI BakaSU ${{ env.EXPECTED_UNAME }} (${{ github.ref_type == 'tag' && github.ref_name || format('run {0}', github.run_number) }})
+          generate_release_notes: true
+          body: |
+            REDMI K90 (`annibale`) AOSP GKI **${{ env.EXPECTED_UNAME }}**
+            + 内置 BakaSU（ReSukiSU，官方架构）+ SUSFS + Droidspaces 容器配置（kABI 安全）
+            + `RFKILL=y`。
+
+            管理器：ReSukiSU / BakaSU APK（me.sukisu.ultra 系）。
+
+            优先临时启动：
+
+            ```
+            fastboot boot boot.img
+            ```
+
+            不要刷 `system_dlkm*.img`。不要用 16K / 网上通用 GKI。不要 `fastboot boot` `*-lz4.img`。
+          files: |
+            out/aosp-release/boot.img
+            out/BakaSU*-annibale-aosp-*-4k-SUSFS-REL-AnyKernel3.zip

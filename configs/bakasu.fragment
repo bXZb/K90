@@ -1,0 +1,27 @@
+CONFIG_KSU=y
+CONFIG_KALLSYMS=y
+CONFIG_KALLSYMS_ALL=y
+# BakaSU 64bit-only，与 GKI arm64 一致
+# CONFIG_KSU_DEBUG is not set
+# Vendor cfg80211/btpower need rfkill in vmlinux (stock rfkill.ko does not load on custom Image).
+CONFIG_RFKILL=y
+
+# === Droidspaces（对照 Droidspaces-OSS 官方 GKI 配置文档） ===
+# SYSVIPC 系移 task_struct ABI（sysvsem/sysvshm），必须配合 sysvipc-kabi 补丁
+# （02 应用）。CFS_BANDWIDTH/CGROUP_PIDS 无 padding 可救（约 4k 符号 CRC），
+# 保持禁用——--cpus/--pids-limit 放弃。
+# MUST：容器两个硬门槛
+CONFIG_PID_NS=y
+CONFIG_SYSVIPC=y
+CONFIG_IPC_NS=y
+# RECOMMENDED：--hw-access 硬件直通（缺则 tmpfs 兜底）
+CONFIG_DEVTMPFS=y
+# OPTIONAL：作者标注 GKI ABI-safe
+CONFIG_POSIX_MQUEUE=y
+CONFIG_MACVLAN=y
+CONFIG_IP6_NF_NAT=y
+CONFIG_IP6_NF_TARGET_MASQUERADE=y
+# 沙箱（非特权 Docker/Podman/Flatpak）。作者标注 GKI ABI-safe。
+CONFIG_USER_NS=y
+# CONFIG_CFS_BANDWIDTH=y
+# CONFIG_CGROUP_PIDS=y

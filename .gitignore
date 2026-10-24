@@ -1,0 +1,7 @@
+/gki/
+/xiaomi/
+/out/
+/third_party/
+*.rej
+.cache/
+tmp/
