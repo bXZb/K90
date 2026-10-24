@@ -83,7 +83,8 @@ done < "${FRAGMENT}"
 cp -a "${SUSFS_DIR}/kernel_patches/fs/." "${KERNEL_ROOT}/fs/"
 cp -a "${SUSFS_DIR}/kernel_patches/include/linux/." "${KERNEL_ROOT}/include/linux/"
 cd "${KERNEL_ROOT}"
-patch -p1 --no-backup-if-mismatch \
+# --fuzz=3：base.c 等文件的 hunk 需要模糊匹配（kernelsu-official run #44/#64 同参数实证）。
+patch -p1 --forward --fuzz=3 --no-backup-if-mismatch \
   < "${SUSFS_DIR}/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch"
 
 # Droidspaces kABI 补丁（打在 GKI 树 sched.h；上下文 = AOSP r15 原味）。
