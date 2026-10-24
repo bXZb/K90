@@ -118,6 +118,9 @@ sed -i \
   -e 's/^static ssize_t my_write_context(struct file \*file/ssize_t my_write_context(struct file *file/' \
   -e 's/^static ssize_t my_write_access(struct file \*file/ssize_t my_write_access(struct file *file/' \
   "${KSU}/kernel/feature/selinux_hide.c"
+grep -q '^ssize_t my_write_context' "${KSU}/kernel/feature/selinux_hide.c" \
+  || { echo "ERROR: my_write export sed did not apply to selinux_hide.c" >&2; exit 1; }
+echo "[+] selinux_hide.c my_write_* exported (grep verified)"
 
 # Droidspaces kABI 补丁（打在 GKI 树 sched.h；上下文 = AOSP r15 原味）。
 patch -p1 --forward --no-backup-if-mismatch \
