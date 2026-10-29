@@ -26,11 +26,11 @@ on:
         type: string
         default: auto
       ksu_tag:
-        description: "手动指定 tiann/KernelSU 的 tag 或 commit。空 = 联动解析（checkout 到 susfs 最新 sync 点）"
+        description: "KernelSU 版本（例：v3.3.1）。留空 = 自动跟随上游"
         type: string
         default: ""
       susfs_commit:
-        description: "手动 pin ShirkNeko/susfs4ksu 的 commit。空 = 跟随 gki-android15-6.6 HEAD"
+        description: "susfs commit（例：bd7d199a）。留空 = 自动跟随/自动配对"
         type: string
         default: ""
       create_release:
@@ -80,6 +80,22 @@ jobs:
         uses: ./.github/actions/gki-setup
         with:
           free_disk: ${{ startsWith(github.event.inputs.runner || 'ubuntu-22.04', 'ubuntu-') }}
+
+      # 构建计划预览：sync 之前解析最终版本并写进 Step Summary，
+      # 让"这次会编什么"在 1 分钟内可见，版本错误早失败。
+      - name: Build plan (preview)
+        run: |
+          bash scripts/resolve-versions.sh --env-file version.env
+          . ./version.env
+          {
+            echo "### 构建计划"
+            echo "| 组件 | 值 |"
+            echo "|---|---|"
+            echo "| KernelSU ref | \`${KSU_REF_FINAL}\`（${KSU_RESOLVE_MODE}） |"
+            echo "| susfs commit | \`${SUSFS_COMMIT:-HEAD}\` |"
+            echo "| GKI | ${GKI_KERNEL_TAG} @ ${GKI_KERNEL_TAG##*_}（4K） |"
+            echo "| LTO / jobs | ${LTO} / ${BUILD_JOBS} |"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Sync AOSP GKI (01)
         run: bash scripts/01-sync-aosp-gki.sh

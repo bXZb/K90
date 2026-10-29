@@ -26,36 +26,30 @@ SUSFS_DIR="${ROOT}/third_party/susfs4ksu"
 SUSFS_BRANCH="gki-android15-6.6"
 GKI_DEFCONFIG="${KERNEL_ROOT}/arch/arm64/configs/gki_defconfig"
 
-# --- susfs 先行：联动解析要从它的提交史里取 tiann 同步点 ---
-# depth=30 覆盖 sync 间隔；手动 pin 旧 commit 时按同一深度取其祖先史。
+# --- 版本解析：单点逻辑在 resolve-versions.sh。
+# CI 上由预览步骤先行解析并写入 KSU_REF_FINAL 等 env，此处直接信任（防两次
+# 解析间上游漂移）；本地运行无该 env 时自行解析。已验证配对表也在该脚本里。
+KSU_TAG="${KSU_TAG:-}"
+KSU_COMMIT="${KSU_COMMIT:-}"
 SUSFS_COMMIT="${SUSFS_COMMIT:-}"
+if [ -z "${KSU_REF_FINAL:-}" ]; then
+  mkdir -p "${ROOT}/out"
+  bash "${ROOT}/scripts/resolve-versions.sh" --env-file "${ROOT}/out/resolve.env"
+  # shellcheck source=/dev/null
+  . "${ROOT}/out/resolve.env"
+fi
+ref="${KSU_REF_FINAL}"
+echo "[+] resolve mode: ${KSU_RESOLVE_MODE:-env}"
+
+# --- susfs checkout：HEAD 或解析出的 commit ---
 git clone --depth=30 --branch "${SUSFS_BRANCH}" \
   https://github.com/ShirkNeko/susfs4ksu.git "${SUSFS_DIR}"
-if [ -n "${SUSFS_COMMIT}" ]; then
-  git -C "${SUSFS_DIR}" fetch --depth=30 origin "${SUSFS_COMMIT}"
+if [ "${SUSFS_REF_FINAL}" != "HEAD" ]; then
+  git -C "${SUSFS_DIR}" fetch --depth=30 origin "${SUSFS_COMMIT_FINAL}"
   git -C "${SUSFS_DIR}" checkout -q --detach FETCH_HEAD
-  echo "[+] susfs4ksu manual pin @ $(git -C "${SUSFS_DIR}" rev-parse --short HEAD)"
+  echo "[+] susfs4ksu pinned @ $(git -C "${SUSFS_DIR}" rev-parse --short HEAD)"
 else
   echo "[+] susfs4ksu HEAD @ $(git -C "${SUSFS_DIR}" rev-parse --short HEAD)"
-fi
-
-# --- 解析 KSU ref：手动输入优先，否则联动解析 susfs 最新 sync 点 ---
-if [ -n "${KSU_COMMIT}" ]; then
-  ref="${KSU_COMMIT}"
-  echo "[+] KSU ref: manual commit ${ref}"
-elif [ -n "${KSU_TAG}" ]; then
-  ref="${KSU_TAG}"
-  echo "[+] KSU ref: manual tag ${ref}"
-else
-  ref="$(git -C "${SUSFS_DIR}" log -30 --format=%B \
-    | grep -oE 'tiann/KernelSU/commit/[0-9a-f]{40}' \
-    | head -n1 | cut -d/ -f4)"
-  if [ -z "${ref}" ]; then
-    echo "ERROR: susfs 最近 30 条提交里没有 tiann/KernelSU/commit/<sha> 同步点，" \
-         "上游消息格式可能变了。用 ksu_tag / KSU_COMMIT / susfs_commit 手动指定。" >&2
-    exit 1
-  fi
-  echo "[+] KSU ref: linked sync point ${ref} (parsed from susfs log)"
 fi
 
 cd "${KERNEL_ROOT}"
