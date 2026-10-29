@@ -57,10 +57,20 @@ elif [ -n "${KSU_TAG}" ]; then
   if [ -z "${SUSFS_COMMIT}" ] && paired_susfs "${KSU_TAG}" >/dev/null 2>&1; then
     SUSFS_COMMIT="$(paired_susfs "${KSU_TAG}")"
     susfs_note="（已验证配对表自动补全）"
+  elif [ -z "${SUSFS_COMMIT}" ]; then
+    echo "WARNING: ksu_tag=${KSU_TAG} 不在已验证配对表且未指定 susfs_commit——" \
+         "susfs 将跟随 HEAD，配对未经校验。" >&2
   fi
 else
   mode="linked"
   git clone --depth=30 --branch "${SUSFS_BRANCH}" "${SUSFS_REPO}" "${TMP}/susfs" >/dev/null 2>&1
+  if [ -n "${SUSFS_COMMIT}" ]; then
+    # 只 pin susfs 侧：KSU 仍联动到该 susfs 历史声明的 sync 点。
+    git -C "${TMP}/susfs" fetch --depth=30 origin "${SUSFS_COMMIT}"
+    git -C "${TMP}/susfs" checkout -q --detach FETCH_HEAD
+    susfs_ref="${SUSFS_COMMIT}"
+    susfs_note="（手动 pin）"
+  fi
   ksu_ref="$(git -C "${TMP}/susfs" log -30 --format=%B \
     | grep -oE 'tiann/KernelSU/commit/[0-9a-f]{40}' \
     | head -n1 | cut -d/ -f4)"
